@@ -133,12 +133,13 @@ void VariantSelect::PopulateVariantButtons() {
         const Track& track = cups->GetTrack(selectedPulsarId);
         u32 variantCount = track.variantCount;
         const u32 maxButtons = 4;
-        u32 displayCount = variantCount + 1;
-        if (displayCount > maxButtons) displayCount = maxButtons;
-        for (u32 i = 0; i < displayCount; ++i) {
-            variantButtonVariants[i] = static_cast<u8>(i);
+        //Variants banned online are skipped, the buttons left over stay at 0xFF and get hidden
+        u32 shown = 0;
+        for (u32 v = 0; v <= variantCount && shown < maxButtons; ++v) {
+            if (CupsConfig::IsVariantOutOfPool(selectedPulsarId, v)) continue;
+            variantButtonVariants[shown++] = static_cast<u8>(v);
         }
-        variantButtonsPopulated = (displayCount > 0);
+        variantButtonsPopulated = (shown > 0);
     } else {
         variantButtonsPopulated = false;
     }

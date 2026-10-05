@@ -240,6 +240,12 @@ static void SetCupPreviewTrackMessageImpl(LayoutUIControl* control, u32 bmgId, c
     else curCupId = static_cast<PulsarCupId>(cup->ctrlMenuCupSelectCup.curCupID);
 
     PulsarId trackId = CupsConfig::sInstance->ConvertTrack_PulsarCupToTrack(curCupId, trackIdx);
+    if (CupsConfig::IsOutOfPool(trackId)) { //hidden from the cup online, so from its preview too
+        Text::Info emptyInfo;
+        emptyInfo.strings[0] = L"";
+        control->SetMessage(BMG_TEXT, &emptyInfo);
+        return;
+    }
     if (IsTrackBlocked(trackId) && trackIdx < 4) {
         const wchar_t* originalText = GetTrackName(bmgId);
         if (originalText != nullptr) {
@@ -544,13 +550,22 @@ static void ExtCourseSelectCourseInitSelf(CtrlMenuCourseSelectCourse* course) {
     //channel ldb stuff ignored
     const u32 cupId = cupPage->clickedCupId;
 
-    PushButton* toSelect = &course->courseButtons[0];
+    PushButton* toSelect = nullptr;
+    PushButton* firstShown = nullptr;
     for (int i = 0; i < 4; ++i) {
         PushButton& curButton = course->courseButtons[i];
         curButton.buttonId = i;
         const u32 bmgId = GetTrackBMGByRowIdx(i);
-        
+
         PulsarId trackId = cupsConfig->ConvertTrack_PulsarCupToTrack(cupsConfig->lastSelectedCup, i);
+        //Banned tracks can't leave their cup, so online the button goes instead. Set both ways:
+        //the four buttons are the same ones for every cup.
+        const bool isOutOfPool = CupsConfig::IsOutOfPool(trackId);
+        curButton.isHidden = isOutOfPool;
+        curButton.manipulator.inaccessible = isOutOfPool;
+        if (isOutOfPool) continue;
+        if (firstShown == nullptr) firstShown = &curButton;
+
         if (IsTrackBlocked(trackId)) {
             const wchar_t* originalText = GetTrackName(bmgId);
             if (originalText != nullptr) {
@@ -571,6 +586,13 @@ static void ExtCourseSelectCourseInitSelf(CtrlMenuCourseSelectCourse* course) {
             toSelect = &curButton;
         }
     };
+    if (toSelect == nullptr) toSelect = firstShown;
+    if (toSelect == nullptr) { //the whole cup is banned: nothing else to select, the host throws the vote out
+        toSelect = &course->courseButtons[0];
+        toSelect->isHidden = false;
+        toSelect->manipulator.inaccessible = false;
+        toSelect->SetMessage(GetTrackBMGByRowIdx(0));
+    }
     coursePage->SelectButton(*toSelect);
 };
 kmWritePointer(0x808d30d8, ExtCourseSelectCourseInitSelf); //807e5118

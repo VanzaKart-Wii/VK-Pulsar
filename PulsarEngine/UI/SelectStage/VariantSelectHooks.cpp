@@ -28,7 +28,10 @@ static void CourseSelect_OnCourseButtonClick(CtrlMenuCourseSelectCourse* self, P
         bool hasVariants = false;
         if (!cups->IsReg(selected)) {
             const Track& track = cups->GetTrack(selected);
-            if (track.variantCount > 0) hasVariants = true;
+            //online, the variant page only makes sense if a variant is still left after the bans
+            for (u32 v = 1; v <= track.variantCount; ++v) {
+                if (!CupsConfig::IsVariantOutOfPool(selected, v)) hasVariants = true;
+            }
         }
 
         if (hasVariants) {
