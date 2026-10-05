@@ -4,6 +4,9 @@
 #include <SlotExpansion/UI/ExpCupSelect.hpp>
 #include <UI/UI.hpp>
 #include <Settings/Settings.hpp>
+#include <MarioKartWii/GlobalFunctions.hpp>
+#include <MarioKartWii/UI/Page/Other/VR.hpp>
+#include <MarioKartWii/UI/Page/Menu/CharacterSelect.hpp>
 
 
 
@@ -163,8 +166,31 @@ void ExpCupSelect::AfterControlUpdate() {
     }
 }
 
+/*
+Online the vanilla back press has nowhere to go: it opens the "Vote for a course? Vote / Random"
+box, so once the combo is picked the only way to change it is to wait for the next race. In a room
+that goes through the members page (the section has a Pages::VR), B goes back to the character
+select instead, which is the same page the Change button opens; from there kart and drift lead
+back here as usual. Nothing has been voted yet on this page, so there is nothing to take back.
+
+OTT keeps the vanilla box: its combo change is gated by the host setting and tracked in ottMgr.
+*/
+static bool CanGoBackToCharacterSelect() {
+    const SectionMgr* sectionMgr = SectionMgr::sInstance;
+    if(sectionMgr == nullptr || sectionMgr->curSection == nullptr) return false;
+    const Section* section = sectionMgr->curSection;
+    if(!IsOnlineSection(section->sectionId)) return false;
+    if(System::sInstance->IsContext(PULSAR_MODE_OTT)) return false;
+    return section->Get<Pages::VR>() != nullptr && section->Get<Pages::CharacterSelect>() != nullptr;
+}
+
 void ExpCupSelect::OnBackPress(u32 hudSlotId) {
     this->randomizedId = PULSARID_NONE;
+    if(CanGoBackToCharacterSelect()) {
+        this->PlaySound(SOUND_ID_BACK_PRESS, hudSlotId);
+        this->LoadPrevPageWithDelayById(PAGE_CHARACTER_SELECT, 0.0f);
+        return;
+    }
     CupSelect::OnBackPress(hudSlotId);
 }
 
