@@ -22,6 +22,34 @@ inline bool IsGroupedTrack(PulsarId id) {
         default: return false; //no group defined for this pack
     }
 }
+
+/*
+    Tracks that are never played online: always out of the worldwides and mogis, out of friend
+    rooms through the host's track pool setting. Written the way the Pack Creator lists them: the
+    custom cup number (1 = first custom cup, vanilla cups not counted) and the track in it, 1 to 4.
+    They stay in their cup offline and are hidden from it online. Don't ban all four tracks of a cup.
+*/
+#define ONLINE_BANNED_TRACK(cup, track) (((cup) - 1) * 4 + (track) - 1)
+inline bool IsOnlineBannedTrack(PulsarId id) {
+    if(id < PULSARID_FIRSTCT || id == PULSARID_NONE) return false;
+    switch(id - PULSARID_FIRSTCT) {
+        //case ONLINE_BANNED_TRACK(12, 3): //track name, so the list stays readable
+        //    return true;
+        default: return false;
+    }
+}
+
+/*
+    Single variants never played online, same rules as IsOnlineBannedTrack. The track is the number
+    of its file in Tracks and the variant the number after the underscore: 215_1.szs is 215, 1.
+    The main track (variant 0) can't be banned here, use IsOnlineBannedTrack for that.
+*/
+inline bool IsOnlineBannedVariant(PulsarId id, u32 variantIdx) {
+    if(id < PULSARID_FIRSTCT || id == PULSARID_NONE || variantIdx == 0) return false;
+    const u32 track = id - PULSARID_FIRSTCT;
+    if(track == 215 && variantIdx == 1) return true; //215_1.szs
+    return false;
+}
 #ifdef BETA
 #  define VK_REGION_OFFSET 100
 #else

@@ -64,6 +64,8 @@ public:
     void SaveSelectedCourse(const PushButton& courseButton);
     PulsarCupId GetNextCupId(PulsarCupId cupId, s32 direction) const;
     PulsarId RandomizeTrack() const;
+    static bool IsOutOfPool(PulsarId id); //left out of this room's tracks (PULSAR_NOVANILLA, PULSAR_NOBANNED)
+    static bool IsVariantOutOfPool(PulsarId id, u32 variantIdx); //same for a single variant
 
     //Reg Check
     static inline bool IsReg(PulsarId pulsarId) { return pulsarId < 0x100 || pulsarId == 0xFFFFU; }

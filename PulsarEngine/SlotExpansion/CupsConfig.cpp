@@ -106,6 +106,7 @@ u32 CupsConfig::RandomizeVariant(PulsarId id) const {
         const Track& track = GetTrack(id);
         Random random;
         variantIdx = random.NextLimited(track.variantCount + 1);
+        if (IsVariantOutOfPool(id, variantIdx)) variantIdx = 0; //banned online: the main track instead
     }
     return variantIdx;
 }
@@ -152,7 +153,12 @@ void CupsConfig::ToggleCTs(bool enabled) {
     }
     else {
         count = definedCTsCupCount;
-        hasRegs = regsMode > 0;
+        hasRegs = regsMode > 0 && !System::sInstance->IsContext(PULSAR_NOVANILLA);
+        if (!hasRegs && IsRegCup(lastSelectedCup)) {
+            selectedCourse = PULSARID_FIRSTCT;
+            lastSelectedCup = PULSARCUPID_FIRSTCT; //regs cup -> CT, it's gone from the page
+            lastSelectedCupButtonIdx = 0;
+        }
     }
     ctsCupCount = count;
 }
@@ -178,12 +184,29 @@ void CupsConfig::GetExpertPath(char* dest, PulsarId id, TTMode mode, u8 variantI
 PulsarId CupsConfig::RandomizeTrack() const {
     Random random;
     u32 pulsarId;
-    if (this->HasRegs()) {
-        pulsarId = random.NextLimited(this->GetCtsTrackCount() + 32);
-        if (pulsarId > 31) pulsarId += (0x100 - 32);
+    //Vanilla tracks are already out through hasRegs, this is for the banned ones. Bounded so that
+    //a list banning almost everything can't hang the vote.
+    for (int tries = 0; tries < 32; ++tries) {
+        if (this->HasRegs()) {
+            pulsarId = random.NextLimited(this->GetCtsTrackCount() + 32);
+            if (pulsarId > 31) pulsarId += (0x100 - 32);
+        }
+        else pulsarId = random.NextLimited(this->GetCtsTrackCount()) + 0x100;
+        if (!IsOutOfPool(static_cast<PulsarId>(pulsarId))) break;
     }
-    else pulsarId = random.NextLimited(this->GetCtsTrackCount()) + 0x100;
     return static_cast<PulsarId>(pulsarId);
+}
+
+bool CupsConfig::IsOutOfPool(PulsarId id) {
+    const System* system = System::sInstance;
+    if (system == nullptr) return false;
+    if (IsReg(id)) return system->IsContext(PULSAR_NOVANILLA);
+    return system->IsContext(PULSAR_NOBANNED) && Network::IsOnlineBannedTrack(id);
+}
+
+bool CupsConfig::IsVariantOutOfPool(PulsarId id, u32 variantIdx) {
+    const System* system = System::sInstance;
+    return system != nullptr && system->IsContext(PULSAR_NOBANNED) && Network::IsOnlineBannedVariant(id, variantIdx);
 }
 
 /*

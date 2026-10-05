@@ -45,6 +45,9 @@ enum Context {
     PULSAR_EXTENDEDTEAMS,
     PULSAR_VR, //ranked friend room
     PULSAR_MODE_COUNTDOWN, //terza voce dello scroller dei modi in Race settings
+    PULSAR_NOVANILLA, //no vanilla tracks: always in public rooms, host setting in friend rooms
+    PULSAR_NOBANNED, //no tracks from Network::IsOnlineBannedTrack, same rules as PULSAR_NOVANILLA
+    PULSAR_PLAYERS24, //friend room VS where every console with one player also brings a CPU, see Race/Players24/Online24.cpp
     PULSAR_CONTEXT_COUNT,
 };
 
