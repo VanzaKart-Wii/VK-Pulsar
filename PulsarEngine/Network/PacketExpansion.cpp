@@ -1,4 +1,5 @@
 #include <Network/PacketExpansion.hpp>
+#include <runtimeWrite.hpp>
 
 extern "C" void OSReport(const char* format, ...);
 
@@ -27,19 +28,25 @@ public:
     RKNet::RoomType roomType; //0xe8
     u8 unknown_0xec[4];
 
-    RKNet::SplitRACEPointers* splitToSendRACEPackets[2][12]; //0xf0 split pointers for the outgoing packets, double buffered, indexed by aid
-    RKNet::SplitRACEPointers* splitReceivedRACEPackets[2][12]; //0x150 split pointers for the incoming packets, double buffered, indexed by aid
-    RKNet::PacketHolder<void>* fullSendPackets[12]; //0x1b0 combined outgoing packets, indexed by aid
-    u64 lastRACEToSendTimes[12]; //0x1e0 time when last sent to that aid
-    u64 lastRACERecivedTimes[12]; //0x240 time when last received from that aid
-    u64 RACEToSendTimesTaken[12]; //0x2a0 last send time minus the time of the send before it
-    u64 RACEReceivedTimesTaken[12]; //0x300 last receive time minus the time of the receive before it
+    u8 vanillaPerAidArrays[0x360 - 0xf0]; //0xf0 moved below for 24 aids (Race/Players24/Online24Aid.inc)
     u8 lastRACESendAid; //0x360 aid a packet was last sent to
 
-    //MODIFICATIONS
-    u8 defaultBuffer[0x25b0 - 0x361]; //0x361 1 per aid
+    //MODIFICATIONS: the vanilla fullReceivedPackets[12][0x2e0] area, DWC receives in fullPulRecvPackets instead
+    u8 padding[7]; //0x361
+    RKNet::SplitRACEPointers* splitToSendRACEPackets[2][24]; //0x368 split pointers for the outgoing packets, double buffered, indexed by aid
+    RKNet::SplitRACEPointers* splitReceivedRACEPackets[2][24]; //0x428 split pointers for the incoming packets, double buffered, indexed by aid
+    RKNet::PacketHolder<void>* fullSendPackets[24]; //0x4e8 combined outgoing packets, indexed by aid
+    u64 lastRACEToSendTimes[24]; //0x548 time when last sent to that aid
+    u64 lastRACERecivedTimes[24]; //0x608 time when last received from that aid
+    u64 RACEToSendTimesTaken[24]; //0x6c8 last send time minus the time of the send before it
+    u64 RACEReceivedTimesTaken[24]; //0x788 last receive time minus the time of the receive before it
+    u32 lastSendBufferUsed[24]; //0x848 last full send buffer used for each aid, 0 or 1
+    u32 lastReceivedBufferUsed[24][8]; //0x8a8 last Received buffer used for each packet per aid, 1 or 0
+    u64 selectTime350DivTime3B0[24]; //0xba8
+    void* fullPulRecvPackets[24]; //0xc68
+    u8 unused[0x25b0 - 0xcc8]; //0xcc8
     u32 toDisconnectAids; //0x25b0 for wiimmfi only?
-    void* fullPulRecvPackets[12]; //0x25b4
+    u8 unused2[0x25e4 - 0x25b4]; //0x25b4 fullPulRecvPackets[12] before the 24 aids
     //END
 
     RKNet::StatusData localStatusData; //0x25e4 8 bytes, see http://wiki.tockdom.com/wiki/MKWii_Network_Protocol/Server/gpcm.gs.nintendowifi.net#locstring
@@ -54,8 +61,7 @@ public:
     u8 unknown_0x2760[4];
     s32 vr; //0x2764
     s32 br; //0x2768
-    u32 lastSendBufferUsed[12]; //0x276c last full send buffer used for each aid, 0 or 1
-    u32 lastReceivedBufferUsed[12][8]; //0x279c last Received buffer used for each packet per aid, 1 or 0
+    u8 vanillaBufferUsed[0x291c - 0x276c]; //0x276c moved
     s32 currentSub; //0x291c index of the current sub to use, 0 or 1
     u8 aidsBelongingToPlayerIds[12]; //0x2920 index is player id, value is aid
     u32 disconnectedAids; //0x292c 1 if disconnected, index 1 << aid
@@ -64,6 +70,24 @@ public:
 
 };
 size_assert(CustomRKNetController, 0x29c8);
+
+//Same layout as RKNet::Controller (Race/Players24/Online24Aid.cpp); never called, checked at compile time
+static void CheckLayout() {
+    offset_assert(CustomRKNetController, splitReceivedRACEPackets, 0x428);
+    offset_assert(CustomRKNetController, lastReceivedBufferUsed, 0x8a8);
+    offset_assert(CustomRKNetController, fullPulRecvPackets, 0xc68);
+    offset_assert(CustomRKNetController, toDisconnectAids, 0x25b0);
+    offset_assert(CustomRKNetController, localStatusData, 0x25e4);
+    offset_assert(CustomRKNetController, shutdownScheduled, 0x2755);
+    offset_assert(CustomRKNetController, currentSub, 0x291c);
+    offset_assert(ExpSELECTHandler, receivedPackets, 0x76);
+    offset_assert(ExpSELECTHandler, lastReceivedTimes, 0x80);
+    offset_assert(ExpSELECTHandler, unknown_0x350, 0x140);
+    offset_assert(ExpSELECTHandler, unknown_0x3b0, 0x200);
+    offset_assert(ExpSELECTHandler, lastSentToAid, 0x2e0);
+    offset_assert(ExpSELECTHandler, hasNewSELECT, 0x3e0);
+    offset_assert(ExpSELECTHandler, aidsThatHaveVoted, 0x3f0);
+}
 
 void* CreateSendAndRecvBuffers() {
 
@@ -74,9 +98,53 @@ void* CreateSendAndRecvBuffers() {
     asm(mr controller, r27;);
     asm(mr aid, r20;);
 
-    controller->fullPulRecvPackets[aid] = new u8[totalRACESize];
     holder->bufferSize = totalRACESize;
-    return new u8[totalRACESize];
+    if(aid < 12) {
+        controller->fullPulRecvPackets[aid] = new u8[totalRACESize];
+        void* send = new u8[totalRACESize];
+        return send;
+    }
+    /*
+    Aids 12-23 (Race/Players24/Online24Aid.cpp): the Controller is created at boot, when the current heap can't
+    take twice the buffers, so these come from the Controller's own heap (DWC's, about 600 KiB free).
+    */
+    controller->fullPulRecvPackets[aid] = EGG::Heap::alloc(totalRACESize, 0x20, controller->Heap);
+    void* send = EGG::Heap::alloc(totalRACESize, 0x20, controller->Heap);
+    return send;
+}
+
+#ifndef PROD
+//Copy of the receive buffer pointers taken when the Controller is built: the log says if one changes afterwards
+static void* createdRecvPackets[24];
+static const void* createdController = nullptr;
+//End of the constructor (Online24Aid.cpp): sInstance isn't set yet, the object comes from the hook
+void RememberRecvBuffers(const void* object) {
+    const CustomRKNetController* controller = reinterpret_cast<const CustomRKNetController*>(object);
+    createdController = object;
+    for(int aid = 0; aid < 24; ++aid) createdRecvPackets[aid] = controller->fullPulRecvPackets[aid];
+    OSReport("[VK 24P] Controller %p built, receive buffers aid 0 %p, aid 23 %p\n", object,
+        createdRecvPackets[0], createdRecvPackets[23]);
+}
+static void CheckRecvBuffers(const CustomRKNetController* controller, const char* where) {
+    if(controller != createdController) OSReport("[VK 24P] %s: Controller %p, built %p\n", where, controller, createdController);
+    for(int aid = 0; aid < 24; ++aid) {
+        if(controller->fullPulRecvPackets[aid] == createdRecvPackets[aid]) continue;
+        OSReport("[VK 24P] %s: receive buffer of aid %d is %p, was %p at creation\n", where, aid,
+            controller->fullPulRecvPackets[aid], createdRecvPackets[aid]);
+    }
+}
+#else
+void RememberRecvBuffers(const void*) {}
+static void CheckRecvBuffers(const CustomRKNetController*, const char*) {}
+#endif
+
+//A missing receive buffer (allocation failed or overwritten) is made again from the Controller's heap
+static void* RecvBuffer(CustomRKNetController* controller, u8 aid) {
+    if(controller->fullPulRecvPackets[aid] == nullptr) {
+        controller->fullPulRecvPackets[aid] = EGG::Heap::alloc(totalRACESize, 0x20, controller->Heap);
+        OSReport("[VK 24P] receive buffer of aid %d made again: %p\n", aid, controller->fullPulRecvPackets[aid]);
+    }
+    return controller->fullPulRecvPackets[aid];
 }
 kmCall(0x806570b4, CreateSendAndRecvBuffers);
 
@@ -94,26 +162,57 @@ static const u32 sizeArray[8] = {
 */
 
 
-kmWrite8(0x8089a19b, sizeof(PulRH1));
-kmWrite8(0x8089a19f, sizeof(PulRH2));
-kmWrite8(0x8089a1a3, sizeof(PulSELECT));
-kmWrite8(0x8089a1a7, 2 * sizeof(PulRACEDATA));
-kmWrite8(0x8089a1ab, sizeof(PulUSER));
-kmWrite8(0x8089a1af, 2 * sizeof(PulITEM));
-kmWrite8(0x8089a1b3, sizeof(PulEVENT));
+/*
+    Checked on the P, E and K discs, not on J: the vanilla sizes are verified first, so a wrong
+    address in versions.txt leaves the game alone instead of patching half of whatever is there.
+*/
+kmRuntimeUse(0x8089a19b);
+kmRuntimeUse(0x8089a19f);
+kmRuntimeUse(0x8089a1a3);
+kmRuntimeUse(0x8089a1a7);
+kmRuntimeUse(0x8089a1ab);
+kmRuntimeUse(0x8089a1af);
+kmRuntimeUse(0x8089a1b3);
+static void ExpandPacketSizes() {
+    struct Size { u32 address; u8 vanilla; u8 expanded; };
+    const Size sizes[7] ={
+        { kmRuntimeAddr(0x8089a19b), 0x28, sizeof(PulRH1) },
+        { kmRuntimeAddr(0x8089a19f), 0x28, sizeof(PulRH2) },
+        { kmRuntimeAddr(0x8089a1a3), 0x38, sizeof(PulSELECT) },
+        { kmRuntimeAddr(0x8089a1a7), 0x80, 2 * sizeof(PulRACEDATA) },
+        { kmRuntimeAddr(0x8089a1ab), 0xc0, sizeof(PulUSER) },
+        { kmRuntimeAddr(0x8089a1af), 0x10, 2 * sizeof(PulITEM) },
+        { kmRuntimeAddr(0x8089a1b3), 0xf8, sizeof(PulEVENT) },
+    };
+    for (int i = 0; i < 7; ++i) {
+        if (*(volatile u8*)sizes[i].address != sizes[i].vanilla) {
+            OSReport("[PacketExpansion] size table not found at 0x%08X, packets not expanded\n", sizes[i].address);
+            return;
+        }
+    }
+    for (int i = 0; i < 7; ++i) KamekRuntimeWrite::Write8(sizes[i].address, sizes[i].expanded);
+}
+static BootHook PacketSizesHook(ExpandPacketSizes, 4);
 
 void SetProperRecvBuffers(u8 aid, void* usualBuffer, u32 usualSize) {
     register CustomRKNetController* controller;
     asm(mr controller, r31;);
-    memset(controller->fullPulRecvPackets[aid], 0, totalRACESize);
-    DWC::SetRecvBuffer(aid, controller->fullPulRecvPackets[aid], totalRACESize);
+    if(aid == 0) CheckRecvBuffers(controller, "ConnectToWFC");
+    void* buffer = RecvBuffer(controller, aid);
+    if(buffer == nullptr) return;
+    memset(buffer, 0, totalRACESize);
+    DWC::SetRecvBuffer(aid, buffer, totalRACESize);
 }
 kmWrite32(0x80658c78, 0x60000000); //prevent usual memset
 kmCall(0x80658c90, SetProperRecvBuffers);
 
 void ProperRecvBuffersClear() {
-    const CustomRKNetController* controller = reinterpret_cast<CustomRKNetController*>(RKNet::Controller::sInstance);
-    for(int aid = 0; aid < 12; ++aid) memset(controller->fullPulRecvPackets[aid], 0, totalRACESize);
+    CustomRKNetController* controller = reinterpret_cast<CustomRKNetController*>(RKNet::Controller::sInstance);
+    CheckRecvBuffers(controller, "Controller::Init");
+    for(int aid = 0; aid < 24; ++aid) {
+        void* buffer = RecvBuffer(controller, aid);
+        if(buffer != nullptr) memset(buffer, 0, totalRACESize);
+    }
 }
 kmCall(0x8065607c, ProperRecvBuffersClear);
 
@@ -161,8 +260,8 @@ bool DisconnectBadAids() {
     asm(mr controller, r15;);
 
     int old = OS::DisableInterrupts();
-    for(int aid = 0; aid < 12; ++aid) {
-        if(controller->toDisconnectAids >> aid) DWC::CloseConnectionHard(aid);
+    for(int aid = 0; aid < 24; ++aid) {
+        if(controller->toDisconnectAids & (1 << aid)) DWC::CloseConnectionHard(aid); //only the aids that sent a bad packet
     }
     controller->toDisconnectAids = 0;
     OS::RestoreInterrupts(old);
@@ -181,7 +280,7 @@ ExpSELECTHandler* CreateRecvArr(ExpSELECTHandler* handler) { //wiimmfi hook prev
     register RKNet::OnlineMode mode;
     asm(mr mode, r31;);
     handler->mode = mode;
-    handler->receivedPackets = new PulSELECT[12];
+    handler->receivedPackets = new PulSELECT[24]; //one per aid, 24 consoles (Race/Players24/Online24Handlers.inc)
     return handler;
 }
 kmCall(0x8065fec0, CreateRecvArr);

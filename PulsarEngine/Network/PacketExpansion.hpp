@@ -100,6 +100,10 @@ struct PulSELECT : public RKNet::SELECTPacket {
     u8 curBlockingArrayIdx;  // Current write index in circular buffer
     bool lastGroupedTrackPlayed;
     u16 blockedTracks[MAX_TRACK_BLOCKING];  // PulsarId array
+
+    //Ids 12-23 of the host's id table (playerIdToAid has 0-11): sent only in a 24 players room, everywhere else the
+    //packet stops before them (PULSELECT_BASE_SIZE) and stays as it was (Race/Players24/Online24Consoles.cpp)
+    u8 playerIdToAidExt[12];
 };
 
 struct PulRACEDATA : public RKNet::RACEDATAPacket {};
@@ -110,7 +114,8 @@ struct PulEVENT : public    RKNet::EVENTPacket {}; //NOT RECOMMENDED as this has
 
 static_assert(sizeof(PulROOM) < sizeof(PulSELECT), "ROOM SELECT");
 static_assert(sizeof(PulRH1) == 51, "PulRH1 cambiata: aggiorna MatchHeader in mkwSecurity.cpp");
-static_assert(sizeof(PulSELECT) == 98, "PulSELECT cambiata: aggiorna RoomSelect in mkwSecurity.cpp");
+static_assert(sizeof(PulSELECT) == 110, "PulSELECT cambiata: aggiorna RoomSelect in mkwSecurity.cpp");
+static const u32 PULSELECT_BASE_SIZE = 98; //what is sent outside a 24 players room
 
 class ExpSELECTHandler {
 public:
@@ -120,16 +125,19 @@ public:
     RKNet::OnlineMode  mode; //from page 0x90 OnInit SectionId Switch
     u32 unknown_0x4;
     PulSELECT toSendPacket; //0x8
-    PulSELECT* receivedPackets; //sizeof(PulSELECT) + 0x8
+    PulSELECT* receivedPackets; //sizeof(PulSELECT) + 0x8 = 0x76, this struct is packed (RKNet/RACEDATA.hpp)
 
-    u8 padding[0x2e0 - (sizeof(PulSELECT) + 0x8 + 4)];
+    u8 padding[0x80 - (sizeof(PulSELECT) + 0x8 + 4)];
+    //Moved from 0x2f0 for 24 aids (Race/Players24/Online24Handlers.inc)
+    u64 lastReceivedTimes[24]; //0x80
+    u64 unknown_0x350[24]; //0x140
+    u32 unknown_0x3b0[24]; //0x200
+    u8 padding2[0x2e0 - 0x260];
 
     u8 lastSentToAid; //0x2e0
     u8 unknown_0x2e4[7];
     u64 lastSentTime; //0x2e8
-    u64 lastReceivedTimes[12]; //0x2f0
-    u64 unknown_0x350[12]; //0x350
-    u32 unknown_0x3b0[12]; //0x3b0
+    u8 vanillaTimes[0x3e0 - 0x2f0]; //0x2f0 moved to 0x70
     u32 hasNewSELECT; //0x3e0 bitflag
     u32 hasNewRACEHEADER_1; //0x3e4 bitflag
     u32 aidsWithAccurateRaceSettings; //0x3e8
