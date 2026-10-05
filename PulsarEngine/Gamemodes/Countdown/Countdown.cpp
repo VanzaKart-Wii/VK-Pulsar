@@ -802,12 +802,16 @@ What Countdown5 really writes (offsets decoded against Item::Behavior, 0x1C byte
     TRIPLE_GREEN_SHELL objId OBJ_FAKE_ITEM_BOX                   -> fake item boxes
     TRIPLE_RED_SHELL   objId OBJ_GREEN_SHELL                     -> green shells
 
-The earlier version of this table pointed three of those at Picture_01/02/03 (placeholder
-spheres) and two more at textures that only exist swapped inside CTDN.szs. That archive is a
-Scene/UI/Race.szs variant which this pack does not load, so those icons were either placeholders
-or plain wrong; and swapping the textures for real would change them in every other mode too,
-because Race.szs is shared. Naming the right pane costs nothing and is scoped to the mode, since
-this function is only branched in while countdown is active.
+The original CTDN.szs is a Scene/UI/Race.szs variant that swaps six item textures in place, which
+this pack cannot do: Race.szs is shared, so the swap would leak into every other mode. Three of
+those six textures are pixel for pixel vanilla icons (kame_red_3, kame_green_3, kinoko_big), so
+their slots just name that pane. The other three are new art and live in PULitem.brlyt
+(Assets/RaceAssets.szs) as extra panes next to megaTC and feather:
+    cd_kinoko      tt_item_cd_kinoko.tpl      mushroom + green shell  (MUSHROOM slot)
+    cd_kinoko_big  fm_item_cd_kinoko_l.tpl    mushroom + bob-omb      (MEGA_MUSHROOM slot)
+    cd_dummybox_3  tt_item_cd_dummybox_3.tpl  three fake item boxes   (TRIPLE_GREEN_SHELL slot)
+Naming a pane is scoped to the mode, since this function is only branched in while countdown is
+active, and it means the RaceAssets.szs of every pack has to carry those three panes.
 
 This replaces GetItemIconPaneName wholesale, so every item has to be listed.
 */
@@ -817,19 +821,19 @@ static const char* CountdownItemIconPaneName(ItemId id, u32 count) {
         case RED_SHELL:          return "kame_red";
         case BANANA:             return "banana";
         case FAKE_ITEM_BOX:      return "dummybox";
-        case MUSHROOM:           return "kame_green";                               //one thrown green shell
+        case MUSHROOM:           return "cd_kinoko";                                //one thrown green shell
         case TRIPLE_MUSHROOM:    return count >= 2 ? "kame_red_3" : "kame_red";     //circling red shells
         case BOBOMB:             return "bomb_hei";
         case BLUE_SHELL:         return "kame_wing";
         case LIGHTNING:          return "thunder";
         case STAR:               return "star";
         case GOLDEN_MUSHROOM:    return "GoldenKinoko";
-        case MEGA_MUSHROOM:      return "bomb_hei";                                 //throws a bob-omb
+        case MEGA_MUSHROOM:      return "cd_kinoko_big";                            //throws a bob-omb
         case BLOOPER:            return "gesso";
         case POW_BLOCK:          return "pow";
         case THUNDER_CLOUD:      return "kinoko_big";                               //Mega Mushroom
         case BULLET_BILL:        return "killer";
-        case TRIPLE_GREEN_SHELL: return "dummybox";                                 //fake item boxes
+        case TRIPLE_GREEN_SHELL: return count >= 2 ? "cd_dummybox_3" : "dummybox";  //fake item boxes
         case TRIPLE_RED_SHELL:   return count >= 2 ? "kame_green_3" : "kame_green"; //green shells
         case TRIPLE_BANANA:      return count >= 2 ? "banana_3" : "banana";
         default:                 return "empty";
@@ -904,6 +908,26 @@ static u32 originalBranches[branchCount];
 static u32 originalWrites[writeCount];
 static u32 originalEndRace;
 static u8 originalHudNameByte;
+/*
+Countdown5 speeds the music up by writing straight into U32_MUSIC_SPEED, the 1.0f constant the
+music player reads its pitch from, and only puts 1.0f back once the clock runs out. Leaving the
+race during the ramp kept the music fast in every later race, so the value is put back whenever
+the mode goes off or a new race loads.
+
+It is also checked like a hook site: the symbol used to be missing from the NTSC-U map, so the
+linker left it at the PAL address, which on that version is the middle of a string table. The
+writes then corrupted it and the next race in another mode loaded to a black screen.
+*/
+static const u32 musicSpeedVanilla = 0x3F800000; //1.0f
+static u32 originalMusicSpeed;
+
+static volatile u32* MusicSpeed() {
+    return (volatile u32*)(void*)U32_MUSIC_SPEED;
+}
+
+static void RestoreMusicSpeed() {
+    if(originalMusicSpeed == musicSpeedVanilla) *MusicSpeed() = originalMusicSpeed;
+}
 //Countdown5 rewrites the item behaviour table in place and nothing ever put it back, so the
 //remapped items leaked into every later race of the session: a leaked entry sends an item to an
 //object id that race never loaded, and the first shoot faults on a null pointer.
@@ -1012,6 +1036,11 @@ static void CaptureOriginals() {
         OSReport("[Countdown] HUD name 0x%08X: expected 'l', found 0x%02X\n", kmRuntimeAddr(0x808A9CC7), originalHudNameByte);
         sitesValid = false;
     }
+    originalMusicSpeed = *MusicSpeed();
+    if(originalMusicSpeed != musicSpeedVanilla) {
+        OSReport("[Countdown] music speed 0x%08X: expected 0x%08X, found 0x%08X\n", (u32)MusicSpeed(), musicSpeedVanilla, originalMusicSpeed);
+        sitesValid = false;
+    }
     if(!AreHooksReachable()) sitesValid = false;
     if(!sitesValid) OSReport("[Countdown] mode disabled: the addresses do not match this version of the game\n");
 }
@@ -1051,6 +1080,7 @@ static void ApplyPatches(bool enable) {
         KamekRuntimeWrite::Write8(kmRuntimeAddr(0x808A9CC7), originalHudNameByte);
         KamekRuntimeWrite::Write32(kmRuntimeAddr(0x80535350), originalEndRace);
         RestoreBehaviours();
+        RestoreMusicSpeed();
         //Both point into the race heap, which is about to be torn down.
         CountdownTimerObj = nullptr;
         CountdownDisplayPtr = nullptr;
@@ -1076,6 +1106,7 @@ static void ResetForNewRace() {
     */
     CaptureBehaviours();
     RestoreBehaviours();
+    RestoreMusicSpeed();
 
     if(!patchesApplied) return;
     PUL_BETA_LOG("[Countdown] race start, score reset\n");
