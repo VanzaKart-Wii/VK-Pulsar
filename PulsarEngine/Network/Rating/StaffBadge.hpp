@@ -30,6 +30,7 @@ enum Role {
     ROLE_DEVELOPER,          // 0xF088
     ROLE_CREATIVE_DIRECTOR,  // 0xF089
     ROLE_TRANSLATOR,         // 0xF08A
+    ROLE_BETA_TESTER,        // 0xF08B
     ROLE_COUNT
 };
 

@@ -84,11 +84,11 @@ static const wchar_t STAFF_GLYPH_BASE = 0xF084;
 static const u32 RANK_BMG_BASE = 0x25EE;
 static const u32 RANK_BMG_VANILLA_COUNT = 12;  // wheelType 0-2 x starRank 0-3, and the hard cap
 
-// A staff member sends STAFF_ICON_BASE + role instead of the rank (RatingHooks), 9..14,
-// so RaceAssets maps BMG RANK_BMG_BASE + 9 .. + 14 to the glyphs 0xF085 .. 0xF08A, and
+// A staff member sends STAFF_ICON_BASE + role instead of the rank (RatingHooks), 9..15,
+// so RaceAssets maps BMG RANK_BMG_BASE + 9 .. + 15 to the glyphs 0xF085 .. 0xF08B, and
 // SetRankBMG's bound is raised from 12 to RANK_ICON_INDEX_CAP to let them through.
 static const u32 STAFF_ICON_BASE = MAX_RANK;
-static const u32 RANK_ICON_INDEX_CAP = 15;
+static const u32 RANK_ICON_INDEX_CAP = 16;  // one past STAFF_ICON_BASE + ROLE_BETA_TESTER
 
 #define RATING_RANK_ICON 1
 
