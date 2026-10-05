@@ -8,8 +8,10 @@
 #include <Settings/UI/SettingsPageSelect.hpp>
 #include <Settings/UI/SettingsPanel.hpp>
 #include <MarioKartWii/UI/Page/Other/VR.hpp>
+#include <Race/Players24/Online24.hpp>
 #include <MarioKartWii/UI/Page/Other/SELECTStageMgr.hpp>
 #include <MarioKartWii/UI/Ctrl/CountDown.hpp>
+#include <Settings/Settings.hpp>
 
 namespace Pulsar {
 namespace UI {
@@ -34,7 +36,9 @@ kmWrite24(0x808998b3, 'PUL'); //WifiMemberConfirmButton -> PULiMemberConfirmButt
     Slot map of this page's control group. VR::OnInit runs right below and fills 0 to 0xE with
     the page title, the bottom text, the OK button and the twelve vrControls - one per member of
     the room. Everything Pulsar adds has to go above that, which is why the group is 0x12 slots
-    and the three buttons take 0xF, 0x10 and 0x11.
+    and the three buttons take 0xF, 0x10 and 0x11. In a room past 12 consoles the page has 24
+    vrControls (Race/Players24/Online24Pages.cpp): 0 to 0x1A, the group 0x1E slots and the
+    buttons 0x1B to 0x1D.
 
     The settings button used to be added at slot 5, which is inside the twelve: AddControl
     overwrote a vrControl pointer, so that member was no longer updated or drawn and Check
@@ -43,7 +47,8 @@ kmWrite24(0x808998b3, 'PUL'); //WifiMemberConfirmButton -> PULiMemberConfirmButt
     ExtOnButtonSelect keys off, and it has nothing to do with the slot.
 */
 void ExpVR::OnInit() {
-    this->InitControlGroup(0x12);
+    const u32 firstButton = 3 + Players24::DecideVRRows(); //title, bottom text, OK button, then the rows
+    this->InitControlGroup(firstButton + 3);
     VR::OnInit();
    
     bool hideSettings = false;
@@ -60,7 +65,7 @@ void ExpVR::OnInit() {
         }
     }
 
-    this->AddControl(0x11, settingsButton, 0);
+    this->AddControl(firstButton + 2, settingsButton, 0);
     this->settingsButton.Load(UI::buttonFolder, "SettingsVR", "SettingsVR", 1, 0, hideSettings);
     this->settingsButton.buttonId = 5;
     this->settingsButton.SetOnClickHandler(this->onSettingsClick, 0);
@@ -79,12 +84,16 @@ void ExpVR::OnInit() {
     bool isKOd = false;
     if(system->IsContext(PULSAR_MODE_KO) && system->koMgr->isSpectating) isKOd = true;
 
-    this->AddControl(0xF, this->randomComboButton, 0);
-    this->randomComboButton.isHidden = isKOd;
-    this->randomComboButton.Load(UI::buttonFolder, "PULiMemberConfirmButton", "Random", 1, 0, isKOd);
+    //The Random button can be switched off from the menu settings (ported from rr-pulsar); Change
+    //stays, so the player can still pick a combo by hand.
+    const bool isRandomHidden = isKOd
+        || Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_MENU, SETTINGMENU_RADIO_RANDOMCOMBO) == MENUSETTING_RANDOMCOMBO_HIDDEN;
+    this->AddControl(firstButton, this->randomComboButton, 0);
+    this->randomComboButton.isHidden = isRandomHidden;
+    this->randomComboButton.Load(UI::buttonFolder, "PULiMemberConfirmButton", "Random", 1, 0, isRandomHidden);
     this->randomComboButton.SetOnClickHandler(this->onRandomComboClick, 0);
 
-    this->AddControl(0x10, this->changeComboButton, 0);
+    this->AddControl(firstButton + 1, this->changeComboButton, 0);
     this->changeComboButton.isHidden = isKOd;
     this->changeComboButton.Load(UI::buttonFolder, "PULiMemberConfirmButton", "Change", 1, 0, isKOd);
     this->changeComboButton.SetOnClickHandler(this->onChangeComboClick, 0);
