@@ -29,9 +29,10 @@ public:
     CtrlMenuPageTitleText ctrlMenuBackButton;
     CtrlMenuInstructionText ctrlMenuBottomMessage;
     PushButton okButton; //0x564
-    LayoutUIControl vrControls[12]; //0x7b8
-    CountDown* timer; //0x1928 from page 0x90
-}; //total size 0x192c
-size_assert(VR, 0x192c);
+    //MODIFICATIONS: 24 rows for the online 24 players rooms, the timer after them (Race/Players24/Online24Pages.cpp)
+    LayoutUIControl vrControls[24]; //0x7b8
+    CountDown* timer; //0x2a98 from page 0x90
+}; //total size 0x2a9c
+size_assert(VR, 0x2a9c);
 }//namespace Pages
 #endif

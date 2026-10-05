@@ -59,13 +59,14 @@ public:
     Status status; //0x68
     CountDown countdown; //0x6C
     CountDownTimerControl timerControl; //0x78
-    PlayerInfo infos[12]; //0x1f4 large loop at 80651980, one per player it seems
+    PlayerInfo vanillaInfos[12]; //0x1f4 infos, moved to the end for 24 players (Race/Players24/Online24Pages.cpp)
     u32 playerCount; //0x284
     u32 engineClass; //0x288
     u32 battleType; //0x28c init at 2 8064fe14
     MiiGroup miiGroup; //0x290
-}; //total size 0x328
+    PlayerInfo infos[24]; //0x328 large loop at 80651980, one per player it seems
+}; //total size 0x448
 
-size_assert(SELECTStageMgr, 0x328);
+size_assert(SELECTStageMgr, 0x448);
 }//namespace Pages
 #endif

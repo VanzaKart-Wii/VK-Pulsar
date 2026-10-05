@@ -49,20 +49,21 @@ public:
     CtrlMenuPageTitleText titleText; //0x6c
     CtrlMenuInstructionText bottomText; //0x1e0
     LayoutUIControl votesCounter; //0x354 0/X bottom right
-    VoteControl votes[12]; //0x4c8
-    u32 order[12]; //0x1668 order the votes got handled/displayed, order[playerId] = index of the voteControl used for that player
-    u32 lastHandledVote; //0x1698 voteCount
-    u32 isBattle; //0x169c
-    u32 connectionState; //0x16a0, unsure, but if 3, loads the disconnected box 
-    u32 localPlayerCount; //0x16a4
-    u32 curSelectedVote; //0x16a8, for roulette, 1-indexed
-    u32 winningVote; //0x16ac
-    u32 trackBmgId; //0x16b0
-    float remainingRoulette; //0x16b4
-    float unknown_0x16b8;
-    u32 remainingRouletteDuration; //0x16bc
-}; //total size 0x16c0
-size_assert(Vote, 0x16c0);
+    //MODIFICATIONS: 24 votes for the online 24 players rooms, the fields after them moved (Race/Players24/Online24Pages.cpp)
+    VoteControl votes[24]; //0x4c8
+    u32 order[24]; //0x2808 order the votes got handled/displayed, order[playerId] = index of the voteControl used for that player
+    u32 lastHandledVote; //0x2868 voteCount
+    u32 isBattle; //0x286c
+    u32 connectionState; //0x2870, unsure, but if 3, loads the disconnected box 
+    u32 localPlayerCount; //0x2874
+    u32 curSelectedVote; //0x2878, for roulette, 1-indexed
+    u32 winningVote; //0x287c
+    u32 trackBmgId; //0x2880
+    float remainingRoulette; //0x2884
+    float unknown_0x16b8; //0x2888
+    u32 remainingRouletteDuration; //0x288c
+}; //total size 0x2890
+size_assert(Vote, 0x2890);
 }//namespace Pages
 
 
