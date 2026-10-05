@@ -268,17 +268,26 @@ public:
     RoomType roomType; //0xe8
     u8 unknown_0xec[4];
 
-    SplitRACEPointers* splitToSendRACEPackets[2][12]; //0xf0 split pointers for the outgoing packets, double buffered, indexed by aid
-    SplitRACEPointers* splitReceivedRACEPackets[2][12]; //0x150 split pointers for the incoming packets, double buffered, indexed by aid
-    PacketHolder<void>* fullSendPackets[12]; //0x1b0 combined outgoing packets, indexed by aid
-    u64 lastRACEToSendTimes[12]; //0x1e0 time when last sent to that aid
-    u64 lastRACERecivedTimes[12]; //0x240 time when last received from that aid
-    u64 RACEToSendTimesTaken[12]; //0x2a0 last send time minus the time of the send before it
-    u64 RACEReceivedTimesTaken[12]; //0x300 last receive time minus the time of the receive before it
+    /*
+    The per-aid arrays of the vanilla layout (0xf0-0x360, 0x276c-0x291c, 0x2960-0x29c0) are moved to 24-entry arrays
+    inside the vanilla fullReceivedPackets area, which Pulsar doesn't use (PacketExpansion gives DWC other receive
+    buffers): see PulsarEngine/Race/Players24/Online24Aid.inc. The old places are no longer read or written.
+    */
+    u8 vanillaPerAidArrays[0x360 - 0xf0]; //0xf0
     u8 lastRACESendAid; //0x360 aid a packet was last sent to
+    u8 padding[7]; //0x361
+    SplitRACEPointers* splitToSendRACEPackets[2][24]; //0x368 split pointers for the outgoing packets, double buffered, indexed by aid
+    SplitRACEPointers* splitReceivedRACEPackets[2][24]; //0x428 split pointers for the incoming packets, double buffered, indexed by aid
+    PacketHolder<void>* fullSendPackets[24]; //0x4e8 combined outgoing packets, indexed by aid
+    u64 lastRACEToSendTimes[24]; //0x548 time when last sent to that aid
+    u64 lastRACERecivedTimes[24]; //0x608 time when last received from that aid
+    u64 RACEToSendTimesTaken[24]; //0x6c8 last send time minus the time of the send before it
+    u64 RACEReceivedTimesTaken[24]; //0x788 last receive time minus the time of the receive before it
+    u32 lastSendBufferUsed[24]; //0x848 last full send buffer used for each aid, 0 or 1
+    u32 lastReceivedBufferUsed[24][8]; //0x8a8 last Received buffer used for each packet per aid, 1 or 0
+    u64 selectTime350DivTime3B0[24]; //0xba8
 private: //because it's modified in pulsar
-    u8 fullReceivedPackets[12][0x2e0]; //0x361 1 per aid
-    u8 padding[3]; //0x25e1
+    u8 fullReceivedPacketsRest[0x25e4 - 0xc68]; //0xc68 Pulsar's receive buffer pointers and toDisconnectAids
 public:
     StatusData localStatusData; //0x25e4 8 bytes, see http://wiki.tockdom.com/wiki/MKWii_Network_Protocol/Server/gpcm.gs.nintendowifi.net#locstring
     Friend friends[30]; //0x25ec
@@ -292,15 +301,14 @@ public:
     u32 pParamForSearchString; //0x2760
     s32 vr; //0x2764
     s32 br; //0x2768
-    u32 lastSendBufferUsed[12]; //0x276c last full send buffer used for each aid, 0 or 1
-    u32 lastReceivedBufferUsed[12][8]; //0x279c last Received buffer used for each packet per aid, 1 or 0
+    u8 vanillaBufferUsed[0x291c - 0x276c]; //0x276c vanilla lastSend/ReceivedBufferUsed, moved
     s32 currentSub; //0x291c index of the current sub to use, 0 or 1
     u8 aidsBelongingToPlayerIds[12]; //0x2920 index is player id, value is aid
     u32 disconnectedAids; //0x292c 1 if disconnected, index 1 << aid
     u32 disconnectedPlayerIds; //0x2930 index 1 << playerId
     RatingRangeMaker rangeMaker; //0x2934
     u8 paddingu64[4]; //0x295c
-    u64 selectTime350DivTime3B0[12]; //0x2960
+    u8 vanillaSelectTimes[0x29c0 - 0x2960]; //0x2960 vanilla selectTime350DivTime3B0, moved (the WWFC payload clears 0x29b0-0x29bf)
     u32 biggestRH1Timer; //0x29c0
     u8 unknown_0x29c4[4];
 

@@ -66,8 +66,9 @@ public:
     EVENTPacket sendEVENTBuffer; //0x94
     u8 unknown_0x18c[4];
     u64 lastFriendUpdateTime;
-    u32 playerRH1Timers[12]; //0x198
-}; //total size 0x1c8
-size_assert(PacketMgr, 0x1c8);
+    u8 vanillaRH1Timers[0x30]; //0x198 indexed by aid, moved to the end for 24 aids (Race/Players24/Online24Aid.cpp)
+    u32 playerRH1Timers[24]; //0x1c8
+}; //total size 0x228 (0x1c8 in the game)
+size_assert(PacketMgr, 0x228);
 }//namespace RKNet
 #endif

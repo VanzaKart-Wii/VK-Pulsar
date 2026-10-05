@@ -102,14 +102,17 @@ public:
     u32 unknown_0x4;
 private:
     SELECTPacket toSendPacket; //0x8
-    SELECTPacket receivedPackets[12]; //0x40
+    u8 pulsarReceivedPackets[0x40]; //0x40 vanilla receivedPackets[12]: Pulsar's PulSELECT tail and pointer (ExpSELECTHandler)
 public:
+    //Moved from 0x2f0 for 24 aids (Race/Players24/Online24Handlers.inc), in the unused receivedPackets area
+    u64 lastReceivedTimes[24]; //0x80
+    u64 delaysFromPredictedRecvTimes[24]; //0x140
+    u32 unknown_0x3b0[24]; //0x200
+    u8 unused_0x260[0x2e0 - 0x260];
     u8 lastSentToAid; //0x2e0
     u8 unknown_0x2e4[7];
     u64 lastSentTime; //0x2e8
-    u64 lastReceivedTimes[12]; //0x2f0
-    u64 delaysFromPredictedRecvTimes[12]; //0x350
-    u32 unknown_0x3b0[12]; //0x3b0
+    u8 vanillaTimes[0x3e0 - 0x2f0]; //0x2f0 moved to 0x70
     u32 hasNewSELECT; //0x3e0 bitflag
     u32 hasNewRACEHEADER_1; //0x3e4 bitflag
     u32 aidsWithAccurateRaceSettings; //0x3e8

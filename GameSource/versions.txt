@@ -52,6 +52,7 @@
 805bd2d8-805bd2e3: -0x697c
 805bd39c-805be5ff: -0x7ca4
 805be600-805be603: -0x7c98
+805be610-805be61b: -0x7c98 #GetRuntimeTypeInfo PushButton, USA disc (vtable)
 805be7f4-805be84b: -0x7124
 805be84c-805bed67: +0x64a48
 805bed68-805bed73: -0x7948
@@ -73,6 +74,7 @@
 805d7f78-805dbfdb: +0x50574
 805dbfdc-805DC033: +0x2A620
 805dc034-805de837: +0x5051c
+805de838-805de843: +0x5c00 #GetRuntimeTypeInfo Pages::Menu, USA disc (vtable + typeinfo refs)
 805de844-805e0c37: +0x50510
 805e0c38-805e6b4f: -0x15ddc
 805e6b50-805e745f: +0x4a5f8
@@ -100,9 +102,7 @@
 806453e4-806467d3: +0x73a8
 806467d4-8064a3f3: -0x32810
 8064a3f4-8064aee3: +0x3788
-8064aef8-8064c283: -0x33314
-8064c284-8064c28b: -0x33318
-8064c28c-80651beb: -0x33314
+8064aef8-80651beb: -0x33314 #USA disc: no -0x33318 hole at 8064c284, it moved ExpWFCMainPage's patch onto the wrong instruction
 80651bec-806522ff: -0x3580
 80652300-80653207: -0x33a14
 80653208-8065b353: -0x4488
@@ -217,7 +217,8 @@
 807edd98-807ee23b: +0x53dd4
 807ee250-807ee467: -0x9d64
 807ee474-807eea13: +0x53b9c
-807eea14-807ef9f3: -0xa310
+807eea14-807eea1f: +0x53b9c #GetRuntimeTypeInfo CtrlRaceGhostDiffTime, USA disc (vtable): the class sits elsewhere in USA
+807eea20-807ef9f3: -0xa310
 807efd0c-807f76eb: -0xa628
 807f76ec-807f7ba3: +0x4b1fc
 807f7bc4-807f890b: -0xab00
@@ -287,6 +288,7 @@
 80899692-8089973a: -0x7730
 80899a36-80899eef: -0x7890
 8089a194-8089A1B7: -0x46d0
+808a10d8-808a10db: -0x4708
 808a1d80-808a1e6f: -0x4a08
 808a22e0-808a22ef: -0x46D0
 808a4e00-808a56ff: -0x49c0
@@ -298,6 +300,7 @@
 808a9c0a-808a9cc8: -0x58c8
 808a9fec-808AA1af: -0x5928
 808AAA04-808aaa10: -0x5980
+808ab770-808ab773: -0x5cb0 #kartsSortedByWeight, USA disc
 808acb3f-808acb43: -0x5f10
 808acfdf-808ad02b: -0x60C0
 808ad48e-808ad492: -0x2980
@@ -326,14 +329,18 @@
 #Verified against RMCE StaticR.rel: the relocations of ObjBomb::ObjBomb and ObjBomb::CreateArray
 #point at 0x808cd474 where PAL points at 0x808d1bdc, and 808d1b14/808d1cd4/808d1ce0 shift by the
 #same -0x4768.
+808d1860-808d1863: -0x4768 #matNames, USA disc (10 refs)
 808d1b14-808d1ce3: -0x4768
 808d1dd0-808d1e2b: -0x3a98
 808d30d8-808d324f: -0x4908
 808d3698-808d369b: +0x1ab0
 808d36d4-808d36d7: +0x1ab0
 808d374c-808d374f: +0x1ab0
+808d3a98-808d3a9b: -0x4e30 #__vt__12CtrlRaceBase, USA disc
 808d3c78-808D3D1B: +0x1610
 808d3e14-808d3f2f: -0x4F68
+808d4110-808d4113: +0x1360 #__vt__24CtrlRaceWifiStartMessage, USA disc
+808d8d78-808d8d7b: -0x5c20 #__vt__Q25Pages4Menu, USA disc (60 refs)
 808d9a58-808d9a98: -0x60f0
 808d9bc8-808D9C5F: -0x36c0
 808d9db0-808D9F97: -0x6220
@@ -358,14 +365,17 @@
 809c2108-809c210b: -0x47b0
 809c210c-809c210f: -0x47d0
 809c2110-809c211b: -0x47d8
-809c21d0-809c21d8: +0xB840
+809c21d0-809c21d8: -0x47c0 #checked on the USA disc (was +0xB840)
 809c2328-809c232b: -0x47c8
 809c26b8-809c26bb: -0x4700
 809c27f8-809c289b: -0x4C40
+809c2be8-809c2beb: -0x4850 #AI::Manager::sInstance, checked on the USA disc
 809c2cb8-809c2cbb: -0x47e0
 809c2f38-809c361b: -0x47f8
 809c3670-809c38cf: -0x4808
+809c4618-809c461b: -0x48b8 #typeInfo VSSettings, USA disc (4 refs)
 809c4680-809c4683: -0x48c0
+809c4730-809c4733: -0x48e0 #RacePauseMgr::sInstance, USA disc (20 refs)
 809c4740-809c474f: -0x47b0
 #
 [J]
@@ -388,6 +398,7 @@
 8063bd28-8063bd2f: -0x920
 8063bd38-8063bd3f: -0x920
 8063be40-8088f3ff: -0x994
+80890030-80890207: -0x9b0 #pointsRoom, from Insane Kart Wii
 80890208-80890977: -0x9B0
 80891750-8089175f: -0x9B0
 80891a60-80891a6f: -0x9B0
@@ -428,10 +439,21 @@
 8017e650-8017ebc3: +0x458
 8017f674-801e8413: +0x35c
 801e8414-8020fd0f: +0x428
+8020fd18-8020fd8b: +0x420 #MKW-SP port.py
+8020fe24-8021008b: +0x388 #MKW-SP port.py (beginFrame, called every frame by Frameskip)
 802100a0-80244ddf: +0x374
-80276054-8027b000: -0x12150
+80258184-80258187: -0x240 #No Background Blur, K = 80257F44 (mariokartwii.com tid=485)
+80276054-80279e27: -0x12220 #K disc: DWC data, 390 refs from 80276100 on
+80279e28-80279eff: -0x1214c #K disc (6 refs)
+80279f00-8027b000: -0x12150 #K disc (96 refs)
 802a3d60-803858df: -0x12000
-80385fc0-8038917b: -0x11fe0
+80385fc0-80386fa3: -0x11fe0 #K disc (8759 refs)
+80386fa4-80386fd3: -0x11fe0
+80386fd4-80386fd7: -0x11fc8 #K disc
+80386fd8-80386fdb: -0x11fd8 #K disc
+80386fdc-80386fdf: -0x11fe0
+80386fe0-80388b3f: -0x11fd0 #K disc: sdata2 (4010 refs)
+80388b40-8038917b: -0x11fe0 #K disc (1010 refs)
 805103b4-8051d72b: -0x11fe0
 8051e488-8052a323: -0x11fdc
 8052a338-805c08cb: -0x11fa8
@@ -454,7 +476,9 @@
 80675f2c-806771f7: -0x11ca0
 80677c3c-80678133: -0x11c58
 8067818c-80742b57: -0x11c58
+80742bc0-80743153: -0x11c40 #checked on the Korean disc (80742b58-80742bbf differs)
 80743154-8088f3ff: -0x11c40
+80890030-808904b7: -0x11c00 #K disc: pointsRoom (2 refs, Insane Kart Wii's -0xc968 was wrong), /Race/Common and /Scene/UI/Font strings
 80892f2c-80892f96: -0x11bf8
 80893217-80895c8c: -0x11bf0
 8089647a-808966d4: -0x116d8
@@ -463,12 +487,16 @@
 80896b8f-80896b93: -0x116d8
 8089703c-80897040: -0x11cb1
 80897c63-80897c67: -0x116d8
+80897dd0-80897def: -0x116d8 #K disc: /Scene/UI/Race and /Scene/UI/Award strings
 80898955-80898959: -0x11b88
 80899692-80899b25: -0x11bc8
+80899b26-8089a71b: -0x11bc8 #Insane Kart Wii: msgWindowBRCTR, packet size table
+808a10d8-808a10db: -0x11ba0 #U32_MUSIC_SPEED, K = 8088F538 (mariokartwii.com tid=598)
 808a1d80-808a1e6f: -0x11ba0
 808a3960-808a3963: -0x11b88
+808a56ec-808a56ef: -0x11ba0 #Insane Kart Wii (Countdown)
 808a5894-808a5abf: -0x11ba0
-808a5bc0-808a5bc3: -0x11b9c
+808a5bc0-808a5bc7: -0x11ba0 #K disc: blueShellSpeed = 80894024 (the LSM gecko code's 80894034 is wrong)
 808a5c24-808a5dc3: -0x11ba0
 808a7de0-808add2c: -0x11ba0
 808aeb45-808aeb55: -0x11ba0
@@ -480,8 +508,11 @@
 808b59f4-808b5cbf: -0x11b88
 808b5cd8-808b5cdb: -0x11b84
 808bbec8-808bbed3: -0x11b90
-808be908-808be9f7: -0x11b48
+808be908-808be9f7: -0x11b90 #K disc: __vt__27SheetSelectControlScaleFade (4 refs)
+808bf4c0-808bfbbb: -0x11b90 #Insane Kart Wii (WFCConnect vtable)
+808c02cc-808c0d3f: -0x11b90 #Insane Kart Wii (SELECTStageMgr vtable)
 808cb550-808da617: -0x11b68
 808e2bbc-808e2bbe: +0x0
 809bd6e8-809c4683: -0x119c0
+809c4730-809c4733: -0x119c0 #K disc: RacePauseMgr::sInstance (20 refs)
 #

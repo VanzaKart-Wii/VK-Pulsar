@@ -68,9 +68,10 @@ public:
     u8 padding2[3];
     u8 osTimeAlignmentPadding[4];
     OS::Time time; //0x18
-    RH1Data rh1Data[12]; //0x20
-}; //total size 0x260
-size_assert(RH1Handler, 0x260);
+    u8 vanillaRH1Data[0x260 - 0x20]; //0x20 rh1Data[12], moved to the end for 24 aids (Race/Players24/Online24Handlers.inc)
+    RH1Data rh1Data[24]; //0x260
+}; //total size 0x6e0 (0x260 in the game)
+size_assert(RH1Handler, 0x6e0);
 
 }//namespace RKNet
 #endif
