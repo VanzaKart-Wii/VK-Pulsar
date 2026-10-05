@@ -19,7 +19,15 @@
 #ifndef _WIILINK_
 #define _WIILINK_
 
-static void* s_payloadStorage = nullptr;
+/*
+The payload runs from this block and patches the game with relative bl instructions, which only
+reach +-32 MB: the block has to be in MEM1, next to the game's code. From June to October it came
+from the system heap, which sometimes placed it in MEM2 (0x9357xxxx): the login then crashed in the
+network thread, jumping from 800d879c (bl qr2_parse_query, patched by the payload) to 0x7F57xxxx,
+the MEM2 target cut to 26 bits. The root MEM1 heap has no 128 KB left at login, so it is static
+again, in Pulsar's own memory (as before June).
+*/
+static u8 s_payloadBlock[PAYLOAD_BLOCK_SIZE + 0x20];
 static void *s_payload = nullptr;
 static bool s_payloadReady = false;
 static u8 s_saltHash[SHA256_DIGEST_SIZE];
@@ -148,16 +156,8 @@ static asm void DWCi_Auth_SendRequest(
 static bool EnsurePayloadBuffer() {
     if (s_payload != nullptr) return true;
 
-    if (s_payloadStorage == nullptr) {
-        EGG::Heap* heap = RKSystem::mInstance.EGGSystem;
-        if (heap == nullptr) return false;
-
-        // Keep the large payload buffer out of Kamek's boot-time BSS reservation.
-        s_payloadStorage = EGG::Heap::alloc(PAYLOAD_BLOCK_SIZE + 0x20, 0x20, heap);
-        if (s_payloadStorage == nullptr) return false;
-    }
-
-    s_payload = reinterpret_cast<void*>((u32(s_payloadStorage) + 31) & ~31);
+    s_payload = reinterpret_cast<void*>((u32(s_payloadBlock) + 31) & ~31);
+    OS::Report("[VK WWFC] payload buffer at %p\n", s_payload);
     return true;
 }
 
