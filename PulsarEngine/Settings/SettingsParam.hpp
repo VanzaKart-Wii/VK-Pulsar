@@ -51,6 +51,7 @@ enum MenuSettings {
     SETTINGMENU_RADIO_MUSIC = 2,
     SETTINGMENU_RADIO_INPUTVIEWER = 3,
     SETTINGMENU_RADIO_BRSAR = 4,
+    SETTINGMENU_RADIO_RANDOMCOMBO = 5,
     SETTINGMENU_SCROLL_BOOT = 0 + 6,
     SETTINGMENU_SCROLL_HUDCOLOR = 1 + 6
 };
@@ -64,7 +65,8 @@ enum RaceSettings {
     SETTINGRACE_RADIO_TT,
 
     SETTINGRACE_SCROLL_SOM = 0 + 6,
-    SETTINGRACE_SCROLL_ITEMMODE = 1 + 6
+    SETTINGRACE_SCROLL_ITEMMODE = 1 + 6,
+    SETTINGRACE_SCROLL_PLAYERS = 2 + 6
 };
 
 enum HostSettings {
@@ -73,7 +75,9 @@ enum HostSettings {
     SETTINGHOST_RADIO_CC = 2,
     SETTINGHOST_ALLOW_MIIHEADS = 3,
     SETTINGHOST_RADIO_THUNDERCLOUD = 4,
-    SETTINGHOST_RADIO_RANKED_UNUSED = 5,
+    //Reuses the slot of the old ranked friend room toggle, which is why a save from a build that
+    //had it on comes back without the vanilla tracks.
+    SETTINGHOST_RADIO_TRACKPOOL = 5,
     SETTINGHOST_SCROLL_GP_RACES = 0 + 6
 };
 
@@ -119,6 +123,13 @@ enum MenuSettingInputViewer {
 enum MenuSettingBrsar {
     MENUSETTING_BRSAR_ENABLED = 0x0,
     MENUSETTING_BRSAR_DISABLED = 0x1
+};
+
+//The Random button on the online members page. Shown is 0 so that saves from before the row
+//existed keep the button.
+enum MenuSettingRandomCombo {
+    MENUSETTING_RANDOMCOMBO_SHOWN = 0x0,
+    MENUSETTING_RANDOMCOMBO_HIDDEN = 0x1
 };
 
 enum MenuSettingBoot {
@@ -179,6 +190,12 @@ enum RaceSettingItemMode {
     RACESETTING_ITEMMODE_COUNTDOWN
 };
 
+//24 players (Race/Players24). 12 is 0 so that saves from before the row keep the stock race.
+enum RaceSettingPlayers {
+    RACESETTING_PLAYERS_12,
+    RACESETTING_PLAYERS_24
+};
+
 //HOST SETTINGS
 enum HostSettingHAW {
     HOSTSETTING_HOSTWINS_DISABLED,
@@ -205,6 +222,15 @@ enum ThunderCloud {
 enum HostSettingMOGI {
     HOSTSETTING_MOGI_DISABLED,
     HOSTSETTING_MOGI_ENABLED
+};
+
+//Which tracks a friend room can play. Public rooms and mogis always use HOSTSETTING_TRACKPOOL_WW.
+//One row for both because the host page has no radio slot left (6 and up are the scrollers).
+enum HostSettingTrackPool {
+    HOSTSETTING_TRACKPOOL_ALL,
+    HOSTSETTING_TRACKPOOL_NOVANILLA,
+    HOSTSETTING_TRACKPOOL_NOBANNED, //see Network::IsOnlineBannedTrack
+    HOSTSETTING_TRACKPOOL_WW //neither of the two
 };
 
 enum HostSettingGPRACES {
