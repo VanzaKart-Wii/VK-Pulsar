@@ -3,11 +3,20 @@
 #include <SlotExpansion/CupsConfig.hpp>
 #include <SlotExpansion/UI/ExpansionUIMisc.hpp>
 #include <Gamemodes/OnlineTT/OTTRegional.hpp>
+#include <Race/Players24/Online24.hpp>
 
 namespace Pulsar {
 namespace UI {
 bool ExpFroomMessages::isOnModeSelection = false;
 s32 ExpFroomMessages::clickedButtonIdx = 0;
+
+//In the lobby the room hasn't started yet, so there is no context to read: a mogi turns host
+//wins off (PULSAR_HAW), and without this the host still got the track list for the first race.
+static bool IsHostWinsLobby() {
+    const Settings::Mgr& settings = Settings::Mgr::Get();
+    return settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_HOSTWINS)
+        && settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_MOGI) == HOSTSETTING_MOGI_DISABLED;
+}
 
 void ExpFroomMessages::OnModeButtonClick(PushButton& button, u32 hudSlotId) {
     this->clickedButtonIdx = button.buttonId;
@@ -31,6 +40,7 @@ void ExpFroomMessages::OnCourseButtonClick(PushButton& button, u32 hudSlotId) {
         else {
             PulsarCupId cupId = static_cast<PulsarCupId>(cupsConfig->ConvertTrack_IdxToPulsarId(id) / 4);
             pulsarId = cupsConfig->ConvertTrack_PulsarCupToTrack(cupId, id % 4);
+            if (CupsConfig::IsOutOfPool(pulsarId)) pulsarId = cupsConfig->RandomizeTrack();
         }
     }
     else pulsarId = static_cast<PulsarId>(pulsarId + 0x20U); //Battle
@@ -40,13 +50,18 @@ void ExpFroomMessages::OnCourseButtonClick(PushButton& button, u32 hudSlotId) {
     Pages::FriendRoomMessages::OnModeButtonClick(clickedButton, 0);
 }
 
+//A room opened with 24 places only starts plain VS (Race/Players24/Online24.hpp): its menu has that button alone
+static u32 ModeButtonCount() {
+    return Players24::IsHostingRoom24() ? 1 : 7; // 4 standard + VK WW (4) + OTT WW (5) + Item Rain WW (6)
+}
+
 static void OnStartButtonFroomMsgActivate() {
     register ExpFroomMessages* msg;
     asm(mr msg, r31;);
 
-    if (!Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_HOSTWINS)) {
+    if (!IsHostWinsLobby()) {
         msg->onModeButtonClickHandler.ptmf = &Pages::FriendRoomMessages::OnModeButtonClick;
-        msg->msgCount = 7; // 4 standard + VK WW (4) + OTT WW (5) + Item Rain WW (6)
+        msg->msgCount = ModeButtonCount();
     }
     else {
         for (int i = 0; i < 4; ++i) msg->messages[0].buttons[i].HandleDeselect(0, -1);
@@ -61,7 +76,7 @@ static void OnStartButtonFroomMsgActivate() {
         }
         else {
             msg->isOnModeSelection = true;
-            msg->msgCount = 7; // 4 standard + VK WW (4) + OTT WW (5) + Item Rain WW (6)
+            msg->msgCount = ModeButtonCount();
             msg->onModeButtonClickHandler.ptmf = &ExpFroomMessages::OnModeButtonClick;
         }
     }
@@ -69,7 +84,7 @@ static void OnStartButtonFroomMsgActivate() {
 kmCall(0x805dc480, OnStartButtonFroomMsgActivate);
 
 static void OnBackPress(ExpFroomMessages& msg) {
-    if (Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_HOSTWINS) && msg.location == 1) {
+    if (IsHostWinsLobby() && msg.location == 1) {
         if (!msg.isOnModeSelection) {
             msg.isEnding = false;
             msg.OnActivate();
@@ -98,7 +113,7 @@ u32 CorrectModeButtonsBMG(const RKNet::ROOMPacket& packet) {
     if (absRowIdx == 6) return BMG_ITEMRAIN_WW_START_MESSAGE;
 
     // Hostwins track/battle selection phase
-    const bool hostwins = Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_HOSTWINS);
+    const bool hostwins = IsHostWinsLobby();
     if (hostwins && !messages->isOnModeSelection) {
         if (messages->clickedButtonIdx >= 2 && messages->clickedButtonIdx < 4) {
             return BMG_BATTLE + messages->curPageIdx * 4 + pageRowIdx + DELFINO_PIER;
@@ -167,7 +182,8 @@ static void RemapAndStoreSentMessage() {
     asm(mr packet, r30;);
     asm(mr manager, r28;);
     u32 message = (packet >> 8) & 0xFFFF;
-    if (message >= 4 && message <= 9) {
+    //The host starts what its clients get: plain VS in a 24 players room (PulROOM.cpp)
+    if ((message >= 4 && message <= 9) || Players24::IsHostingRoom24()) {
         packet = packet & 0xFF0000FF;
     }
     *(volatile u32*)((u8*)manager + 0x2c60) = packet;

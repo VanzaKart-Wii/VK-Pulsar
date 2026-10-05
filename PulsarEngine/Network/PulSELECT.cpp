@@ -11,6 +11,7 @@
 #include <Network/GPReport.hpp>
 #include <Network/Rating/PlayerRating.hpp>
 #include <Network/Rating/RatingNetwork.hpp>
+#include <Race/Players24/Online24.hpp>
 
 
 namespace Pulsar {
@@ -25,6 +26,7 @@ void BeforeSELECTSend(RKNet::PacketHolder<PulSELECT>* packetHolder, PulSELECT* s
     const System* system = System::sInstance;
 
     PointRating::Net::FillLocalPayload(src);
+    Players24::FillCPUSelectData(*src); //only in a 24 players room
 
     const Network::Mgr& netMgr = system->netMgr;
     const u32 blockingCount = system->GetInfo().GetTrackBlocking();
@@ -46,7 +48,9 @@ void BeforeSELECTSend(RKNet::PacketHolder<PulSELECT>* packetHolder, PulSELECT* s
         src->playersData[0].courseVote = vanillaVote;
         src->playersData[1].courseVote = vanillaVote;
     }
-    else len = sizeof(PulSELECT);
+    else len = PULSELECT_BASE_SIZE;
+    //A 24 players room also sends ids 12-23 of the host's table; anywhere else the packet is the same as before
+    if (Players24::IsOnline24()) len = sizeof(PulSELECT);
     packetHolder->Copy(src, len);
 }
 kmCall(0x80661040, BeforeSELECTSend);
@@ -76,7 +80,7 @@ static void AfterSELECTReception(PulSELECT* unused, PulSELECT* src, u32 len) {
     }
 
     System* system = System::sInstance;
-    if (system != nullptr && holder != nullptr && holder->packetSize == sizeof(PulSELECT)) {
+    if (system != nullptr && holder != nullptr && holder->packetSize >= PULSELECT_BASE_SIZE) {
         Network::Mgr& netMgr = system->netMgr;
         const u32 localBlockingCount = system->GetInfo().GetTrackBlocking();
 
@@ -119,11 +123,13 @@ static void AfterSELECTReception(PulSELECT* unused, PulSELECT* src, u32 len) {
         }
     }
 
-    if (holder != nullptr && holder->packetSize == sizeof(PulSELECT)) {
+    if (holder != nullptr && holder->packetSize >= PULSELECT_BASE_SIZE) {
         PointRating::Net::CacheRemotePayload(aid, src);
     }
 
     memcpy(&dest, src, sizeof(PulSELECT));
+    //Sent without ids 12-23 (not a 24 players room): the buffer may still hold an older packet's
+    if (holder == nullptr || holder->packetSize < sizeof(PulSELECT)) memset(dest.playerIdToAidExt, 0xFF, sizeof(dest.playerIdToAidExt));
 }
 kmCall(0x80661130, AfterSELECTReception);
 
@@ -161,24 +167,25 @@ void ExpSELECTHandler::DecideTrack(ExpSELECTHandler& self) {
 
     if (mode == RKNet::ONLINEMODE_PRIVATE_VS && system->IsContext(PULSAR_MODE_KO)) system->koMgr->PatchAids(sub);
 
-    if (mode == RKNet::ONLINEMODE_PRIVATE_VS && Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_HOSTWINS) && !system->IsContext(PULSAR_MODE_KO)) {
+    //The context, not the setting: a mogi clears PULSAR_HAW even when the host has it on
+    if (mode == RKNet::ONLINEMODE_PRIVATE_VS && system->IsContext(PULSAR_HAW) && !system->IsContext(PULSAR_MODE_KO)) {
 
         self.toSendPacket.winningVoterAid = hostAid;
         u16 hostVote = self.toSendPacket.pulVote;
-        if (hostVote == 0xFF) hostVote = cupsConfig->RandomizeTrack();
+        if (hostVote == 0xFF || CupsConfig::IsOutOfPool(static_cast<PulsarId>(hostVote))) hostVote = cupsConfig->RandomizeTrack();
         self.toSendPacket.pulWinningTrack = hostVote;
         self.toSendPacket.variantIdx = cupsConfig->RandomizeVariant(static_cast<PulsarId>(hostVote));
     }
     else {
         const bool isCT = system->IsContext(PULSAR_CT);
         const u32 availableAids = sub.availableAids; //has been modified to remove KO'd player if KO is on
-        u8 aids[12];
-        u8 newVotesAids[12]; //only used for track blocking
-        PulsarId votes[12];
-        bool votedRandom[12];
+        u8 aids[24]; //24 consoles (Race/Players24)
+        u8 newVotesAids[24]; //only used for track blocking
+        PulsarId votes[24];
+        bool votedRandom[24];
         int playerCount = 0;
         int newVoters = 0;
-        for (u8 aid = 0; aid < 12; ++aid) {
+        for (u8 aid = 0; aid < 24; ++aid) {
             if (((1 << aid) & availableAids) == 0) continue;
             aids[playerCount] = aid;
             ++playerCount;
@@ -201,6 +208,11 @@ void ExpSELECTHandler::DecideTrack(ExpSELECTHandler& self) {
                     if (isVS) next += trackCount; //add 32 to match battle ids
                     aidVote = static_cast<PulsarId>(next);
                 }
+            }
+            //A client that still shows them (older build, stale page) can't sneak one in
+            else if (isCT && CupsConfig::IsOutOfPool(aidVote)) {
+                aidVote = cupsConfig->RandomizeTrack();
+                votedRandom[aid] = true;
             }
             votes[aid] = aidVote;
             if (isCT) {
@@ -239,6 +251,7 @@ void ExpSELECTHandler::DecideTrack(ExpSELECTHandler& self) {
         } else {
             winnerVariant = self.receivedPackets[winner].voteVariantIdx[0];
         }
+        if (CupsConfig::IsVariantOutOfPool(vote, winnerVariant)) winnerVariant = 0; //old build or stale page
         self.toSendPacket.variantIdx = winnerVariant;
 
         if (isCT) {
@@ -454,8 +467,10 @@ void InitPatch() {
     select->toSendPacket.allowChangeComboStatus = allowChangeCombo;
     select->toSendPacket.koPerRace = settings.GetSettingValue(Settings::SETTINGSTYPE_KO, SETTINGKO_KOPERRACE) + 1;
     select->toSendPacket.racesPerKO = settings.GetSettingValue(Settings::SETTINGSTYPE_KO, SETTINGKO_RACESPERKO) + 1;
-    for (int aid = 0; aid < 12; ++aid) {
+    memset(select->toSendPacket.playerIdToAidExt, 0xFF, sizeof(select->toSendPacket.playerIdToAidExt));
+    for (int aid = 0; aid < 24; ++aid) {
         PulSELECT& cur = select->receivedPackets[aid];
+        memset(cur.playerIdToAidExt, 0xFF, sizeof(cur.playerIdToAidExt));
         cur.pulVote = 0x43;
         cur.pulWinningTrack = 0xff;
         cur.voteVariantIdx[0] = 0;
@@ -584,7 +599,7 @@ void ProcessNewPacketVoting() {
     const RKNet::Controller* controller = RKNet::Controller::sInstance;
     const RKNet::ControllerSub& sub = controller->subs[controller->currentSub];
 
-    for (int aid = 0; aid < 12; ++aid) {
+    for (int aid = 0; aid < 24; ++aid) { //24 consoles (Race/Players24): aids 12-23 are never connected in a 12 room
         const u8 localAid = sub.localAid;
         const u8 hostAid = sub.hostAid;
         const u32 aidBit = 1 << aid;
@@ -625,6 +640,7 @@ void ProcessNewPacketVoting() {
                     bool hasSameAidArr = true;
                     for (int i = 0; i < 12; ++i) {
                         if (send.playerIdToAid[i] != curRecv.playerIdToAid[i]) hasSameAidArr = false;
+                        if (send.playerIdToAidExt[i] != curRecv.playerIdToAidExt[i]) hasSameAidArr = false; //ids 12-23
                     }
                     if (hasSameAidArr) handler->aidsWithAccurateAidPidMap |= aidBit;
                 }
@@ -657,6 +673,7 @@ void ProcessNewPacketVoting() {
                         send.pulWinningTrack = winningTrack;
                         for (int i = 0; i < 12; ++i) {
                             send.playerIdToAid[i] = curRecv.playerIdToAid[i];
+                            send.playerIdToAidExt[i] = curRecv.playerIdToAidExt[i]; //ids 12-23
                         }
                     }
                 }

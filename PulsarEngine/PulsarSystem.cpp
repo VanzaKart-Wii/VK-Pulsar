@@ -16,6 +16,7 @@
 #include <UI/ExtendedTeamSelect/ExtendedTeamManager.hpp>
 #include <Debug/Debug.hpp>
 #include <Debug/Diag.hpp>
+#include <Race/Players24/Online24.hpp>
 namespace Pulsar {
 
 System* System::sInstance = nullptr;
@@ -271,6 +272,9 @@ void System::UpdateContext() {
     bool isKOFinal = settings.GetSettingValue(Settings::SETTINGSTYPE_KO, SETTINGKO_FINAL) == KOSETTING_FINAL_ALWAYS;
     bool isExtendedTeams = settings.GetUserSettingValue(Settings::SETTINGSTYPE_EXTENDEDTEAMS, RADIO_EXTENDEDTEAMSENABLED) == EXTENDEDTEAMS_ENABLED;
     bool isVR = false; //ranked friend room: decided by the host, obeyed by everyone
+    bool isNoVanilla = isPublicOnlineRoom; //friend rooms read these two from the host below
+    bool isNoBanned = isPublicOnlineRoom;
+    bool isPlayers24 = false; //friend rooms only, from the host
 
     const GameMode mode = racedataSettings.gamemode;
     Network::Mgr& netMgr = this->netMgr;
@@ -306,20 +310,27 @@ void System::UpdateContext() {
                         the host had announced while the host itself drifted back to its settings.
                     */
                     const bool isMogi = (this->context & (1 << PULSAR_STARTMOGI)) != 0;
+                    //A room opened with 24 places: no KO, OTT or extended teams until it closes, as in PulROOM
+                    const bool isRoom24 = Players24::IsHostingRoom24();
+                    const u8 trackPool = settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_TRACKPOOL);
 
-                    newContext = (!isMogi && ottOnline != OTTSETTING_OFFLINE_DISABLED) << PULSAR_MODE_OTT
+                    newContext = (!isMogi && !isRoom24 && ottOnline != OTTSETTING_OFFLINE_DISABLED) << PULSAR_MODE_OTT
                         | (ottOnline == OTTSETTING_ONLINE_FEATHER) << PULSAR_FEATHER
                         | (settings.GetSettingValue(Settings::SETTINGSTYPE_OTT, SETTINGOTT_ALLOWUMTS) ^ true) << PULSAR_UMTS
-                        | (!isMogi && koSetting) << PULSAR_MODE_KO
+                        | (!isMogi && !isRoom24 && koSetting) << PULSAR_MODE_KO
                         | koFinal << PULSAR_KOFINAL
                         | (!isMogi && (settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_ALLOW_MIIHEADS) ^ true)) << PULSAR_MIIHEADS
                         | (!isMogi && settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_HOSTWINS)) << PULSAR_HAW
                         | (isMogi || settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_THUNDERCLOUD) == THUNDERCLOUD_NORMAL) << PULSAR_THUNDERCLOUD
-                        | (!isMogi && isLocalExtendedTeams) << PULSAR_EXTENDEDTEAMS
+                        | (!isMogi && !isRoom24 && isLocalExtendedTeams) << PULSAR_EXTENDEDTEAMS
                         //Same term PulROOM puts in the packet, so the host's own context matches
                         //what its clients receive.
                         | (!isMogi && settings.GetSettingValue(Settings::SETTINGSTYPE_RACE, SETTINGRACE_SCROLL_ITEMMODE) == RACESETTING_ITEMMODE_ITEMRAIN) << PULSAR_ITEMMODERAIN
-                        | (!isMogi && settings.GetSettingValue(Settings::SETTINGSTYPE_RACE, SETTINGRACE_SCROLL_ITEMMODE) == RACESETTING_ITEMMODE_COUNTDOWN) << PULSAR_MODE_COUNTDOWN;
+                        | (!isMogi && settings.GetSettingValue(Settings::SETTINGSTYPE_RACE, SETTINGRACE_SCROLL_ITEMMODE) == RACESETTING_ITEMMODE_COUNTDOWN) << PULSAR_MODE_COUNTDOWN
+                        | (isMogi || trackPool == HOSTSETTING_TRACKPOOL_NOVANILLA || trackPool == HOSTSETTING_TRACKPOOL_WW) << PULSAR_NOVANILLA
+                        | (isMogi || trackPool == HOSTSETTING_TRACKPOOL_NOBANNED || trackPool == HOSTSETTING_TRACKPOOL_WW) << PULSAR_NOBANNED
+                        //Same term PulROOM puts in the packet
+                        | (!isMogi && Players24::HostPlayers24Bit()) << PULSAR_PLAYERS24;
                     /*
                         A mogi is decided once, when the room starts: PulROOM writes the bit into
                         the ROOM packet and SetContext applies it. The host rebuilds its context
@@ -355,6 +366,9 @@ void System::UpdateContext() {
                 isKOFinal = newContext & (1 << PULSAR_KOFINAL);
                 isExtendedTeams = newContext & (1 << PULSAR_EXTENDEDTEAMS);
                 isVR = newContext & (1 << PULSAR_VR);
+                isNoVanilla = newContext & (1 << PULSAR_NOVANILLA);
+                isNoBanned = newContext & (1 << PULSAR_NOBANNED);
+                isPlayers24 = newContext & (1 << PULSAR_PLAYERS24);
                 if(isOTT) {
                     isUMTs &= newContext & (1 << PULSAR_UMTS);
                     isFeather &= newContext & (1 << PULSAR_FEATHER);
@@ -415,10 +429,20 @@ void System::UpdateContext() {
             | (isAllItemsCanLand << PULSAR_ALLITEMSCANLAND)
             | (isKOFinal << PULSAR_KOFINAL)
             | (isExtendedTeams << PULSAR_EXTENDEDTEAMS)
-            | (isCountdown << PULSAR_MODE_COUNTDOWN);
+            | (isCountdown << PULSAR_MODE_COUNTDOWN)
+            | (isNoVanilla << PULSAR_NOVANILLA)
+            | (isNoBanned << PULSAR_NOBANNED)
+            | (isPlayers24 << PULSAR_PLAYERS24);
     }
     this->context = context;
     OSReport("[Pulsar LOG] UpdateContext: final context=0x%08X (extendedTeams=%d)\n", context, isExtendedTeams);
+
+    /*
+        The cup select page refreshes the vanilla cups on its own, but a random offline VS and the
+        host-wins track list in a friend room never go through it: without this they would keep
+        whatever the last room left behind (no vanilla after a worldwide, or the host's old setting).
+    */
+    if(isCT && CupsConfig::sInstance != nullptr) CupsConfig::sInstance->ToggleCTs(true);
 
     //Create temp instances if needed:
     /*

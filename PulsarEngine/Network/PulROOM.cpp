@@ -8,6 +8,7 @@
 #include <Network/PacketExpansion.hpp>
 #include <UI/ExtendedTeamSelect/ExtendedTeamSelect.hpp>
 #include <UI/ExtendedTeamSelect/ExtendedTeamManager.hpp>
+#include <Race/Players24/Online24.hpp>
 
 namespace Pulsar {
 namespace Network {
@@ -78,11 +79,14 @@ static void BeforeROOMSend(RKNet::PacketHolder<PulROOM>* packetHolder, PulROOM* 
         // Save original message before remapping.
         // Messages 4 and 5 are OPT WW and OTT WW starts (added by ExpFroomMessages).
         // Remap them to 0 or 1 so the base game handles them as a normal VS / Team VS start.
-        const u8 originalMessage = destPacket->message;
+        //A room opened with 24 places is a plain VS of 24 players until it closes, whatever the host has set since:
+        //no mogi, battle, team VS or worldwide start, and no KO, OTT or extended teams (Race/Players24/Online24.hpp)
+        const bool isRoom24 = Players24::IsHostingRoom24();
+        const u8 originalMessage = isRoom24 ? 0 : destPacket->message;
         const Settings::Mgr& settings = Settings::Mgr::Get();
-        const bool isStartMogi = settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_MOGI) == 1;
+        const bool isStartMogi = !isRoom24 && settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_MOGI) == 1;
 
-        if (isStartMogi) {
+        if (isStartMogi || isRoom24) {
             destPacket->message = 0; // Force Solo VS
         } else if (originalMessage >= 4 && originalMessage <= 6) {
             destPacket->message = 0; // VS
@@ -103,15 +107,16 @@ static void BeforeROOMSend(RKNet::PacketHolder<PulROOM>* packetHolder, PulROOM* 
         //KO only enabled for normal GPs, and never in a mogi: the message is forced to 0 right
         //above, so without the mogi term the host's KO setting would sail straight through - and
         //its race count (0xFE, below) would win over the mogi one.
-        const u8 koSetting = !isStartMogi && settings.GetSettingValue(Settings::SETTINGSTYPE_KO, SETTINGKO_ENABLED) && destPacket->message == 0;
+        const u8 koSetting = !isStartMogi && !isRoom24 && settings.GetSettingValue(Settings::SETTINGSTYPE_KO, SETTINGKO_ENABLED) && destPacket->message == 0;
         const u8 koFinal = settings.GetSettingValue(Settings::SETTINGSTYPE_KO, SETTINGKO_FINAL) == KOSETTING_FINAL_ALWAYS;
         //invert mii setting as the first button is enabled, not disabled, so a value of 1 indicates disabled
         const u8 ottOnline = settings.GetSettingValue(Settings::SETTINGSTYPE_OTT, SETTINGOTT_ONLINE);
         const bool isExtendedTeams = settings.GetUserSettingValue(Settings::SETTINGSTYPE_EXTENDEDTEAMS, RADIO_EXTENDEDTEAMSENABLED) == EXTENDEDTEAMS_ENABLED;
+        const u8 trackPool = settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_TRACKPOOL);
 
         //A mogi is a plain 150cc VS: OTT is off too, whatever the host has set. The feather and
         //UMT bits below are only read when OTT is on, so this one term is enough to keep them out.
-        destPacket->hostSystemContext = (!isStartMogi && ottOnline != OTTSETTING_OFFLINE_DISABLED) << PULSAR_MODE_OTT //ott
+        destPacket->hostSystemContext = (!isStartMogi && !isRoom24 && ottOnline != OTTSETTING_OFFLINE_DISABLED) << PULSAR_MODE_OTT //ott
             | (ottOnline == OTTSETTING_ONLINE_FEATHER) << PULSAR_FEATHER //ott feather
             | (settings.GetSettingValue(Settings::SETTINGSTYPE_OTT, SETTINGOTT_ALLOWUMTS) ^ true) << PULSAR_UMTS //ott umts
             | koSetting << PULSAR_MODE_KO
@@ -125,7 +130,11 @@ static void BeforeROOMSend(RKNet::PacketHolder<PulROOM>* packetHolder, PulROOM* 
             | (isHostItemRain || isStartItemRainWW) << PULSAR_ITEMMODERAIN
             | isStartMogi << PULSAR_STARTMOGI
             | isHostCountdown << PULSAR_MODE_COUNTDOWN
-            | (isExtendedTeams && !isStartMogi && !isStartVKWW && !isStartOTWW && !isStartItemRainWW) << PULSAR_EXTENDEDTEAMS;
+            | (isStartMogi || trackPool == HOSTSETTING_TRACKPOOL_NOVANILLA || trackPool == HOSTSETTING_TRACKPOOL_WW) << PULSAR_NOVANILLA
+            | (isStartMogi || trackPool == HOSTSETTING_TRACKPOOL_NOBANNED || trackPool == HOSTSETTING_TRACKPOOL_WW) << PULSAR_NOBANNED
+            | (isExtendedTeams && !isRoom24 && !isStartMogi && !isStartVKWW && !isStartOTWW && !isStartItemRainWW) << PULSAR_EXTENDEDTEAMS
+            //24 players room (Race/Players24/Online24.cpp). Clients without it only see an unknown bit.
+            | (!isStartMogi && !isStartVKWW && !isStartOTWW && !isStartItemRainWW && Players24::HostPlayers24Bit()) << PULSAR_PLAYERS24;
 
 
         u8 raceCount;
@@ -160,7 +169,7 @@ static void BeforeROOMSend(RKNet::PacketHolder<PulROOM>* packetHolder, PulROOM* 
         WriteBlockedTracksToPacket(destPacket);
         ConvertROOMPacketToData(*destPacket);
         system->SetContext(destPacket->hostSystemContext);
-        if (isExtendedTeams && !isStartMogi) {
+        if (isExtendedTeams && !isStartMogi && !isRoom24) {
             UI::ExtendedTeamManager::sInstance->hasFriendRoomStarted = true;
         }
     }
@@ -171,10 +180,12 @@ static void BeforeROOMSend(RKNet::PacketHolder<PulROOM>* packetHolder, PulROOM* 
         manager it reads them from is local to the host: that is why the teams were still visible
         on the host's screen in a mogi while nobody else saw them. Both have to stop here too.
     */
-    const bool isMogiRoom = Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_MOGI) == 1;
-    const bool isExtendedTeams = !isMogiRoom
+    //A 24 players room has no extended teams either (Race/Players24/Online24.hpp)
+    const bool isNoTeamsRoom = Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_MOGI) == 1
+        || Players24::IsHostingRoom24();
+    const bool isExtendedTeams = !isNoTeamsRoom
         && Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_EXTENDEDTEAMS, RADIO_EXTENDEDTEAMSENABLED) == EXTENDEDTEAMS_ENABLED;
-    const bool isUpdateTeamMessage = !isMogiRoom && destPacket->messageType == UI::ExtendedTeamManager::MSG_TYPE_UPDATE_TEAMS;
+    const bool isUpdateTeamMessage = !isNoTeamsRoom && destPacket->messageType == UI::ExtendedTeamManager::MSG_TYPE_UPDATE_TEAMS;
     const bool isStartVSRaceMessage = destPacket->messageType == 1 && (destPacket->message == 0 || destPacket->message == 2 || destPacket->message == 3);
     if ((isUpdateTeamMessage || (isStartVSRaceMessage && isExtendedTeams)) && sub.localAid == sub.hostAid) {
         packetHolder->packetSize = sizeof(PulROOM);

@@ -42,7 +42,7 @@ kmCall(0x806652d0, AfterRH1Reception);
 CourseId ReturnCorrectId(const RKNet::RH1Handler& rh1Handler) {
     CupsConfig* cupsConfig = CupsConfig::sInstance;
     const System* system = System::sInstance;
-    for(int aid = 0; aid < 12; ++aid) {
+    for(int aid = 0; aid < 24; ++aid) { //rh1Data has 24 (Race/Players24/Online24Handlers.inc)
         const RKNet::RH1Data& cur = rh1Handler.rh1Data[aid];
         const CourseId curTrack = cur.trackId;
         if(curTrack != 0xFFFFFFFF && (curTrack <= 0x42 || curTrack > 0xff) && cur.timer != 0) {
@@ -67,7 +67,7 @@ CourseId ReturnCorrectId(const RKNet::RH1Handler& rh1Handler) {
 kmBranch(0x80664560, ReturnCorrectId);
 
 const u8* GetRH1aidArray(const RKNet::RH1Handler& rh1) {
-    for(int i = 0; i < 12; ++i) {
+    for(int i = 0; i < 24; ++i) { //rh1Data has 24
         const RKNet::RH1Data& cur = rh1.rh1Data[i];
         const CourseId curTrack = cur.trackId;
         if(curTrack != 0xFFFFFFFF && (curTrack <= 0x42 || curTrack > 0xff)) return &cur.aidsBelongingToPlayer[0];
@@ -80,7 +80,7 @@ kmBranch(0x80664b34, GetRH1aidArray);
 static bool IsThereAValidId() {
     const RKNet::RH1Handler* rh1 = RKNet::RH1Handler::sInstance;
     bool isValid = false;
-    for(int i = 0; i < 12; ++i) {
+    for(int i = 0; i < 24; ++i) { //rh1Data has 24
         const RKNet::RH1Data& cur = rh1->rh1Data[i];
         const CourseId curTrack = cur.trackId;
         if(curTrack != 0xFFFFFFFF && (curTrack <= 0x42 || curTrack > 0xff)) {

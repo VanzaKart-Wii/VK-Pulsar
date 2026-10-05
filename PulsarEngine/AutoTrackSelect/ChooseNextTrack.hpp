@@ -61,7 +61,7 @@ public:
     //HOST VARIABLES
     //s32 maxTimeDiff;
     //s32 readyWait;
-    bool hasReceivedHostTrack[12]; //for the host to send confirmation once everyone has sent their confirmation
+    bool hasReceivedHostTrack[24]; //per aid, 24 consoles. //for the host to send confirmation once everyone has sent their confirmation
 
 private:
     void InitExtraControls(u32 gameControlCount);
