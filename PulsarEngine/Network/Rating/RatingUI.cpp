@@ -105,7 +105,7 @@ static RankId GetEntryRank(const Pages::SELECTStageMgr* mgr, u32 playerId, bool 
     One buffer per entry: SetTextBoxMessage is called once when the page is built, not per
     frame, so a local array would be gone by the time the control draws.
 */
-static wchar_t sRankedNames[12][32];
+static wchar_t sRankedNames[24][32]; //24 rows in the online 24 players rooms (Race/Players24/Online24Pages.cpp)
 
 static wchar_t GetEntryStaffGlyph(const Pages::SELECTStageMgr* mgr, u32 playerId, bool isLocal) {
     const u8 slot = mgr->infos[playerId].hudSlotid;
@@ -119,7 +119,7 @@ static void SetNameWithRank(LayoutUIControl& ctrl, Pages::SELECTStageMgr* mgr, u
     nameInfo.miis[0] = mgr->miiGroup.GetMii((u8)playerId);
 
     const Mii* mii = nameInfo.miis[0];
-    if ((rank == 0 && staffGlyph == 0) || idx >= 12 || mii == nullptr) {
+    if ((rank == 0 && staffGlyph == 0) || idx >= 24 || mii == nullptr) {
         ctrl.SetTextBoxMessage("mii_name", 0x251d, &nameInfo);
         return;
     }
@@ -152,7 +152,7 @@ static void FormatRatingText(float rating, bool hasDecimal, wchar_t* buf, Text::
 }
 
 static void FillVRControl(Pages::VR* page, u32 idx, u32 playerId, u32 team, u8 type, bool isLocal) {
-    if (!page || idx >= 12) return;
+    if (!page || idx >= 24) return; //24 rows in the online 24 players rooms (Race/Players24/Online24Pages.cpp)
     
     LayoutUIControl& ctrl = page->vrControls[idx];
     ctrl.ResetMsg();
