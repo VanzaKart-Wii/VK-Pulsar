@@ -24,7 +24,7 @@ Pulsar::System* System::Create() {
     System* system = new System();
     
     // Initialize all transmissions to default
-    for(int i = 0; i < 12; ++i) {
+    for(int i = 0; i < 24; ++i) {
         system->transmissions[i] = TRANSMISSION_DEFAULT;
     }
     

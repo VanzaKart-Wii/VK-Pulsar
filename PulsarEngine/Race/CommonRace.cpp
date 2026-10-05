@@ -2,6 +2,7 @@
 #include <PulsarSystem.hpp>
 #include <Gamemodes/OnlineTT/OnlineTT.hpp>
 #include <Gamemodes/KO/KOMgr.hpp>
+#include <Race/Players24/Players24.hpp>
 
 namespace Pulsar {
 //For hooks which are shared by different things
@@ -15,13 +16,14 @@ void UpdatePoints(RacedataScenario& scenario) {
     if(system->IsContext(PULSAR_MODE_KO) && system->koMgr->isSpectating) scenario.settings.gametype = GAMETYPE_DEFAULT;
     bool hasVSGhost = false;
     if(system->IsContext(PULSAR_MODE_OTT)) {
-        if(racedata->racesScenario.players[racedata->racesScenario.playerCount - 1].playerType == PLAYER_GHOST) {
+        const u8 last = racedata->racesScenario.playerCount - 1;
+        if(Players24::GetPlayer(racedata->racesScenario, last).playerType == PLAYER_GHOST) {
             hasVSGhost = true;
-            scenario.players[racedata->racesScenario.playerCount - 1].finishPos = racedata->racesScenario.playerCount;
+            Players24::GetPlayer(scenario, last).finishPos = racedata->racesScenario.playerCount;
             racedata->racesScenario.playerCount--;
         }
     }
-    scenario.UpdatePoints();
+    if(!Players24::UpdatePoints24(scenario)) scenario.UpdatePoints();
     racedata->menusScenario.settings.gametype = oldType;
 }
 kmCall(0x8085c878, UpdatePoints);

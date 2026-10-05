@@ -5,6 +5,7 @@
 #include <UI/TransmissionSelect/TransmissionSelect.hpp>
 #include <MarioKartWii/Race/RaceData.hpp>
 #include <MarioKartWii/GlobalFunctions.hpp>
+#include <Race/Players24/Players24.hpp>
 
 /*The MIT License (MIT)
 
@@ -86,9 +87,9 @@ static void SetCPUKartType() {
     Random random;
     u8 localPlayerCount = GetLocalPlayerCount();
     
-    for(int i = localPlayerCount; i < 12; ++i) {
+    for(int i = localPlayerCount; i < Pulsar::Players24::maxPlayers; ++i) {
         VanzaKart::System* vkSystem = static_cast<VanzaKart::System*>(Pulsar::System::sInstance);
-        PlayerType playerType = Racedata::sInstance->racesScenario.players[i].playerType;
+        PlayerType playerType = Pulsar::Players24::GetPlayer(Racedata::sInstance->racesScenario, i).playerType;
         
         if(playerType == PLAYER_CPU && vkSystem->transmissions[i] == VanzaKart::TRANSMISSION_DEFAULT) {
             // Randomly assign transmission to CPU players (Outside or Inside)
@@ -102,7 +103,7 @@ static RaceLoadHook SetCPUKartTypeHook(SetCPUKartType);
 
 static void ResetTransmissions() {
     VanzaKart::System* vkSystem = static_cast<VanzaKart::System*>(Pulsar::System::sInstance);
-    for(int i = 0; i < 12; ++i) {
+    for(int i = 0; i < Pulsar::Players24::maxPlayers; ++i) {
         vkSystem->transmissions[i] = VanzaKart::TRANSMISSION_DEFAULT;
     }
 }

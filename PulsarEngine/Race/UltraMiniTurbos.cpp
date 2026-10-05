@@ -22,7 +22,8 @@ const char* ExpPlayerEffects::UMTNames[8] ={
 };
 
 //Needed so that other players display the correct effect
-bool umtState[12]; //false = no UMT  true = UMT buff active expanding Kart::Movement just for this doesn't seem like the plan
+//Indexed by player id: 24 racers with Race/Players24, 12 entries were written past by racers 13-24
+bool umtState[24]; //false = no UMT  true = UMT buff active expanding Kart::Movement just for this doesn't seem like the plan
 
 kmWrite32(0x8057ee5c, 0x2c050004); //changes >= 3 to >= 4 for UMT
 kmWrite32(0x8057ef30, 0x2c000001); //changes check from if != 2 to if = 1, so that when in a SMT the function keeps going

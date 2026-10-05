@@ -103,7 +103,7 @@ class System : public Pulsar::System {
     };
 
     WeightClass weight;
-    Transmission transmissions[12];
+    Transmission transmissions[24]; //one per racer: CPUs index it by player id, up to 23 in 24-player VS (Race/Players24)
     
     static Pulsar::System* Create();
     static WeightClass GetWeightClass(CharacterId);

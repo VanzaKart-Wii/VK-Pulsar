@@ -3,6 +3,8 @@
 #include <MarioKartWii/Driver/DriverManager.hpp>
 #include <MarioKartWii/RKNet/RKNetController.hpp>
 #include <Network/GPReport.hpp>
+#include <Race/Players24/Online24.hpp>
+#include <Race/Players24/Players24.hpp>
 
 namespace Pulsar {
 
@@ -40,14 +42,14 @@ void EndPlayerRaceHook(Raceinfo* _this, u8 playerIdx) {
     if (_this->players == nullptr || _this->players[playerIdx] == nullptr)
         return;
 
-    RacedataPlayer* racePlayer = &raceData->racesScenario.players[playerIdx];
+    RacedataPlayer* racePlayer = &Pulsar::Players24::GetPlayer(raceData->racesScenario, playerIdx);
     if (racePlayer->playerType == PLAYER_REAL_LOCAL) {
         RKNet::Controller* netController = RKNet::Controller::sInstance;
         RKNet::ControllerSub& sub = netController->subs[netController->currentSub];
 
         s8 hostPlayerIdx = -1;
         for (int i = 0; i < raceData->racesScenario.playerCount; i++) {
-            if (netController->aidsBelongingToPlayerIds[i] == sub.hostAid) {
+            if (Pulsar::Players24::AidOfPlayer(i) == sub.hostAid) { //ids 12-23 in an online 24 room
                 hostPlayerIdx = i;
                 break;
             }
