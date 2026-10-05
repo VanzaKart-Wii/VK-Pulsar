@@ -1,4 +1,5 @@
 #include <hooks.hpp>
+#include <runtimeWrite.hpp>
 #include <kamek.hpp>
 #include <MarioKartWii/Race/RaceData.hpp>
 #include <MarioKartWii/Race/RaceInfo/RaceInfo.hpp>
@@ -227,7 +228,15 @@ static void SELECTStageMgrBeforeControlUpdate(Pages::SELECTStageMgr* stageMgr) {
     }
 }
 
-kmWritePointer(0x808C06E4, SELECTStageMgrBeforeControlUpdate);
+//Only replace the slot if it holds the function it should (SELECTStageMgr::BeforeControlUpdate): a
+//wrong address in versions.txt (J has never been checked on a disc) then does nothing instead of
+//breaking another vtable.
+kmRuntimeUse(0x808C06E4);
+kmRuntimeUse(0x80650218);
+static void PatchSELECTStageMgrVtable() {
+    kmRuntimeCondWrite32A(0x808C06E4, kmRuntimeAddr(0x80650218), reinterpret_cast<u32>(&SELECTStageMgrBeforeControlUpdate));
+}
+static BootHook SELECTStageMgrVtableHook(PatchSELECTStageMgrVtable, 4);
 
 static void PreventVoteChangeSection(Pages::Vote& vote, SectionId id, float delay) {
     static int frameCounter = 0;

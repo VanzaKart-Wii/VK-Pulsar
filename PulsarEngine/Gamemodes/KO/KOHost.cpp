@@ -1,3 +1,4 @@
+#include <Race/Players24/Online24.hpp>
 #include <MarioKartWii/RKNet/SELECT.hpp>
 #include <MarioKartWii/RKNet/ITEM.hpp>
 #include <MarioKartWii/3D/Camera/CameraMgr.hpp>
@@ -47,6 +48,7 @@ void HAWChangeData() {
                 }
             }
         }
+        Players24::SyncAidTable(); //the game reads a 24-entry copy of the table
         for (int playerId = 0; playerId < 12; ++playerId) {
             u8 aid = oldAidsBelonging[playerId];
             u8 hudSlotId = 0;

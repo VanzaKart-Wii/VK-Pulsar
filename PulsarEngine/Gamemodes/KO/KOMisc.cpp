@@ -103,7 +103,7 @@ static void PatchAidsBeforeSELECTStageMgrSetup(Pages::SELECTStageMgr& stageMgr) 
             Network::ExpSELECTHandler& handler = Network::ExpSELECTHandler::Get();
             const Network::PulSELECT* select = nullptr;
             const u8 hostAid = sub.hostAid;
-            if (hostAid == sub.localAid || hostAid >= 12) {
+            if (hostAid == sub.localAid || hostAid >= 24) {
                 select = &handler.toSendPacket;
             } else {
                 select = &handler.receivedPackets[hostAid];
@@ -133,7 +133,7 @@ static u8 SwapUISelectInfo() {
     asm(mr localPlayerCount, r24;);
     asm(mr curHudSlotId, r16;);
 
-    asm(stb r16, 0x1f5(r22););  // default
+    asm(stb r16, 0x329(r22););  // default: SELECTStageMgr::infos[i].hudSlotid, infos moved to 0x328 (Race/Players24/Online24Pages.cpp)
     const System* system = System::sInstance;
     if (system->IsContext(PULSAR_MODE_KO)) {
         if (localPlayerCount == 1) {

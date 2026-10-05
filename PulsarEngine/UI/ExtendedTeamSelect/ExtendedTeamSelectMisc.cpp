@@ -14,6 +14,7 @@
 #include <MarioKartWii/UI/Ctrl/CtrlRace/CtrlRaceRankNum.hpp>
 #include <MarioKartWii/Race/RaceInfo/RaceInfo.hpp>
 #include <Network/Rating/RankManager.hpp>
+#include <Race/Players24/Online24.hpp>
 
 extern "C" void OSReport(const char* format, ...);
 
@@ -76,7 +77,7 @@ void SetBroadcastROOMPacket(RKNet::ROOMHandler* _this, u32 pkt) {
     }
 
     pkt = (messageType << 24) | (message << 8) | messageSequence;
-    for (int i = 0; i < 12; ++i) {
+    for (int i = 0; i < 24; ++i) {
         if (i != sub->localAid) {
             _this->toSendPackets[i] = *(RKNet::ROOMPacket*)&pkt;
         }
@@ -323,6 +324,8 @@ kmCall(0x807f4f74, CtrlRaceResult_InitPatchAnimation);
 kmCall(0x807f4f8c, CtrlRaceResult_InitPatchAnimation);
 
 void WifiAwardResultItem_fillPlayerResult(Pages::WifiAwardResultItem* _this, u8 playerIdx, bool isTeamVS, int localPlayerCount) {
+    // 24 giocatori online: la pagina ha 12 righe, chi e' oltre il 12esimo non ne ha una
+    if (!Pulsar::Players24::FitsWifiResults(playerIdx)) return;
     _this->FillResult(playerIdx, isTeamVS, localPlayerCount);
 
     if (ExtendedTeamManager::IsActivated()) {
