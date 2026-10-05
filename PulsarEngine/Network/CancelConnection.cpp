@@ -77,7 +77,13 @@ static void WFCConnectAfterControlUpdate(Pages::WFCConnect* page) {
     }
     originalAfterControlUpdate(page);
 }
-kmWritePointer(0x808bfaf0, WFCConnectAfterControlUpdate);
+//Only replace the slot if it holds the function it should: a wrong address in versions.txt (J has
+//never been checked on a disc) then does nothing instead of breaking another vtable.
+kmRuntimeUse(0x808bfaf0);
+static void PatchWFCConnectVtable() {
+    kmRuntimeCondWrite32A(0x808bfaf0, reinterpret_cast<u32>(originalAfterControlUpdate), reinterpret_cast<u32>(&WFCConnectAfterControlUpdate));
+}
+static BootHook WFCConnectVtableHook(PatchWFCConnectVtable, 4);
 
 }  // namespace Network
 }  // namespace Pulsar
