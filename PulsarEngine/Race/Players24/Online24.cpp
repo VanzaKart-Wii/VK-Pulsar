@@ -182,8 +182,29 @@ static void InitController(HookRegs& regs, u32) {
 
 typedef s32 (*LocalIdFunc)(const RKNet::Controller* controller, s32 index);
 static void* localIdOriginal = nullptr;
+static s32 LocalIdPast12(const RKNet::Controller* controller, s32 index) {
+    s32 found = 0;
+    if(RKNet::PacketMgr::sInstance != nullptr) {
+        const RacedataScenario& race = Racedata::sInstance->racesScenario;
+        for(u8 id = 0; id < maxPlayers; ++id) {
+            if(GetPlayer(race, id).playerType != PLAYER_REAL_LOCAL) continue;
+            if(found == index) return id;
+            ++found;
+        }
+        return -1;
+    }
+    const u8 localAid = CurrentSub(*controller).localAid;
+    for(u8 id = 0; id < maxPlayers; ++id) {
+        if(AidOfPlayer(id) != localAid) continue;
+        if(found == index) return id;
+        ++found;
+    }
+    return -1;
+}
+
 static s32 GetLocalPlayerId(const RKNet::Controller* controller, s32 index) {
-    const s32 id = reinterpret_cast<LocalIdFunc>(localIdOriginal)(controller, index);
+    s32 id = reinterpret_cast<LocalIdFunc>(localIdOriginal)(controller, index);
+    if(id < 0 && controller != nullptr && Racedata::sInstance != nullptr && IsConsoles24()) id = LocalIdPast12(controller, index);
     if(!IsOnline24()) return id;
     const u8 cpu = GetOwnCPUId();
     if(cpu == noPlayer) return id;

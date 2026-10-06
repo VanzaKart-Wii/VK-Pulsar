@@ -160,27 +160,13 @@ static s32 PlayerIdForUI(void* manager, u8 aid, u8 hudSlotId) {
     return id;
 }
 
-typedef s32 (*LocalIdFunc)(const RKNet::Controller* controller, s32 index);
-static s32 LocalIdForSelect(const RKNet::Controller* controller, s32 index) {
-    const s32 id = reinterpret_cast<LocalIdFunc>(Port(0x80659d58))(controller, index);
-    if(id >= 0 || !IsConsoles24() || controller == nullptr) return id;
-    const u8 localAid = CurrentSub(*controller).localAid;
-    s32 found = 0;
-    for(u8 player = 0; player < maxPlayers; ++player) {
-        if(AidOfPlayer(player) != localAid) continue;
-        if(found == index) return player;
-        ++found;
-    }
-    return -1;
-}
 static const WordPatch words[] ={
     { 0x80660094, 0x2803000b, 0x28030017 },
     { 0x80660994, 0x2803000b, 0x28030017 },
+    { 0x80661968, 0x2803000b, 0x28030017 },
 };
 
 static const CallPatch calls[] ={
-    { 0x80660090, 0x4bff9cc9, reinterpret_cast<const void*>(LocalIdForSelect), false },
-    { 0x80660990, 0x4bff93c9, reinterpret_cast<const void*>(LocalIdForSelect), false },
     { 0x80661498, 0x48000b9d, reinterpret_cast<const void*>(AllocatePlayerIds), false },
     { 0x805fa930, 0x80630004, reinterpret_cast<const void*>(GetMiiChecked), true },
     { 0x80644388, 0x4800ca55, reinterpret_cast<const void*>(PlayerIdForUI), false },
