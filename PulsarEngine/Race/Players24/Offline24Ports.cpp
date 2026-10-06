@@ -84,6 +84,26 @@ static void RaceUIHeap(HookRegs& regs, u32) {
     regs.gpr[4] = reinterpret_cast<u32>(scene->structsHeaps.heaps[heapIdx]);
 }
 
+static const u32 raceEffectsRoom = 0x200000;
+typedef void (*InitRaceEffectsFunc)(void* mgr);
+typedef EGG::Heap* (*BecomeCurrentFunc)(const EGG::Heap* heap);
+static void InitRaceEffects(void* mgr) {
+    EGG::Heap* previous = nullptr;
+    EGG::Heap* mem2 = nullptr;
+    u32 free2 = 0;
+    const GameScene* scene = GameScene::GetCurrent();
+    if(IsReady() && HasExtraRacers() && scene != nullptr && scene->id == SCENE_ID_RACE) {
+        mem2 = scene->structsHeaps.heaps[1];
+        free2 = mem2 != nullptr ? mem2->getAllocatableSize(-8) : 0;
+        if(free2 >= raceEffectsRoom) previous = reinterpret_cast<BecomeCurrentFunc>(Port(0x80229d74))(mem2);
+    }
+    reinterpret_cast<InitRaceEffectsFunc>(Port(0x8067ca4c))(mgr);
+    if(previous != nullptr) {
+        reinterpret_cast<BecomeCurrentFunc>(Port(0x80229d74))(previous);
+        OSReport("[VK 24P] race effects in MEM2: %d KiB\n", (free2 - mem2->getAllocatableSize(-8)) >> 10);
+    }
+}
+
 static void BeginRaceGraphics(HookRegs&, u32) {
     if(!IsSplitActive()) return;
     SetRaceCount(vanillaPlayers);
@@ -334,6 +354,7 @@ static const FuncHook funcs[] ={
 
 static const CallPatch calls[] ={
     { 0x80554570, 0x4bfc7375, CreateRaceSceneHeap },
+    { 0x80554864, 0x481281e9, InitRaceEffects },
 };
 
 static PatchSet offline24Set("Offline24 ports", words, P24_COUNT(words), calls, P24_COUNT(calls), nullptr, 0,
