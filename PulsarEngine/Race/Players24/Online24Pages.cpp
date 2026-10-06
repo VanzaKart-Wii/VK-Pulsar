@@ -126,6 +126,7 @@ static void VoteLoopR26(HookRegs& regs, u32) { CompareRows(regs, regs.gpr[26], v
 
 static const WordPatch words[] ={
 #include <Race/Players24/Online24Pages.inc>
+    { 0x805d47f0, 0x80c40c94, 0x80c40c98 },
 };
 
 static const HookPatch hooks[] ={
