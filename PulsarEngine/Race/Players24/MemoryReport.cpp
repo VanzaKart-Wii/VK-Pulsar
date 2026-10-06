@@ -199,11 +199,28 @@ struct BigAlloc { u32 block; u32 size; u32 callers[8]; };
 static const u32 bigAllocCount = 64;
 static BigAlloc bigAllocs[bigAllocCount];
 static u32 bigAllocNext = 0;
+static bool IsReturnAddress(u32 address) {
+    if(address < 0x80004004 || address >= 0x80900000 || (address & 3) != 0) return false;
+    const u32 previous = *reinterpret_cast<const u32*>(address - 4);
+    if((previous & 0xFC000003) == 0x48000001) return true;
+    return previous == 0x4E800421 || previous == 0x4E800021;
+}
 static void RecordBigAlloc(u32 block, u32 size, u32 sp) {
     BigAlloc& record = bigAllocs[bigAllocNext++ % bigAllocCount];
     record.block = block;
     record.size = size;
     GetCallers(sp, record.callers, 8);
+    if(size < 0x40000) return;
+    u32 found[12];
+    u32 count = 0;
+    for(u32 offset = 0; offset < 0x800 && count < 12; offset += 4) {
+        const u32 word = *reinterpret_cast<const u32*>(sp + offset);
+        if(IsReturnAddress(word)) found[count++] = word;
+    }
+    for(u32 i = count; i < 12; ++i) found[i] = 0;
+    OSReport("[VK 24P] big block %08x %d KiB, stack %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x %08x\n", block,
+        size >> 10, found[0], found[1], found[2], found[3], found[4], found[5], found[6], found[7], found[8], found[9],
+        found[10], found[11]);
 }
 static void ReportBigBlocks(const char* what, const u8* head) {
     if(head == nullptr) return;
