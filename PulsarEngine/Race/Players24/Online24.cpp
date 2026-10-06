@@ -94,7 +94,7 @@ bool ShowsCharacter(u8 id) {
     return IsOnline24() && HasExtraRacers();
 }
 
-bool GetRacerName(u8 id, wchar_t* dst, u32 length) {
+static bool ReadRacerName(u8 id, wchar_t* dst, u32 length) {
     if(dst == nullptr || length == 0 || !IsOnline24() || id >= maxPlayers || IsOnlineCPU(id)) return false;
     const RKNet::Controller* controller = RKNet::Controller::sInstance;
     const u8 aid = AidOfPlayer(id);
@@ -121,6 +121,33 @@ bool GetRacerName(u8 id, wchar_t* dst, u32 length) {
     if(name == nullptr || name[0] == 0) return false;
     u32 i = 0;
     for(; i + 1 < length && i < 10 && name[i] != 0; ++i) dst[i] = name[i];
+    dst[i] = 0;
+    return true;
+}
+
+static wchar_t racerNames[maxPlayers][11];
+static void CacheRacerNames() {
+    for(u8 id = 0; id < maxPlayers; ++id) {
+        if(!ReadRacerName(id, racerNames[id], 11)) racerNames[id][0] = 0;
+    }
+    char line[24 * 12 + 1];
+    u32 length = 0;
+    for(u8 id = 0; id < maxPlayers; ++id) {
+        for(u32 i = 0; i < 10 && racerNames[id][i] != 0; ++i) {
+            const wchar_t c = racerNames[id][i];
+            line[length++] = c >= 0x20 && c < 0x7f ? static_cast<char>(c) : '?';
+        }
+        line[length++] = id + 1 < maxPlayers ? '|' : 0;
+    }
+    line[length] = 0;
+    OSReport("[VK 24P] racer names: %s\n", line);
+}
+
+bool GetRacerName(u8 id, wchar_t* dst, u32 length) {
+    if(dst == nullptr || length == 0 || id >= maxPlayers || !IsOnline24() || IsOnlineCPU(id)) return false;
+    if(racerNames[id][0] == 0) return ReadRacerName(id, dst, length);
+    u32 i = 0;
+    for(; i + 1 < length && i < 10 && racerNames[id][i] != 0; ++i) dst[i] = racerNames[id][i];
     dst[i] = 0;
     return true;
 }
@@ -302,6 +329,7 @@ static void* menuDataSetupOriginal = nullptr;
 static void MenuDataSetup(void* r3, void* r4, void* r5, void* r6) {
     reinterpret_cast<MenuDataSetupFunc>(menuDataSetupOriginal)(r3, r4, r5, r6);
     if(!IsOnline24()) return;
+    CacheRacerNames();
     const RKNet::Controller* controller = RKNet::Controller::sInstance;
     if(controller == nullptr || RKNet::SELECTHandler::sInstance == nullptr) return;
     LogTable();
