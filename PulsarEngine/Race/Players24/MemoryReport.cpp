@@ -195,7 +195,7 @@ static void CheckQR2Record(HookRegs& regs, u32) {
 static const u8* lastDetailedHeap = nullptr;
 static const u8* watchedMem1 = nullptr;
 static u32 lowestMem1 = 0xFFFFFFFF;
-struct BigAlloc { u32 block; u32 size; u32 callers[4]; };
+struct BigAlloc { u32 block; u32 size; u32 callers[8]; };
 static const u32 bigAllocCount = 64;
 static BigAlloc bigAllocs[bigAllocCount];
 static u32 bigAllocNext = 0;
@@ -203,7 +203,7 @@ static void RecordBigAlloc(u32 block, u32 size, u32 sp) {
     BigAlloc& record = bigAllocs[bigAllocNext++ % bigAllocCount];
     record.block = block;
     record.size = size;
-    GetCallers(sp, record.callers, 4);
+    GetCallers(sp, record.callers, 8);
 }
 static void ReportBigBlocks(const char* what, const u8* head) {
     if(head == nullptr) return;
@@ -214,8 +214,9 @@ static void ReportBigBlocks(const char* what, const u8* head) {
         const BigAlloc* found = nullptr;
         for(u32 i = 0; i < bigAllocCount; ++i) if(bigAllocs[i].block == data) found = &bigAllocs[i];
         if(found != nullptr) {
-            OSReport("[VK 24P]   %s block %08x %d KiB, by %08x %08x %08x %08x\n", what, data, block->size >> 10,
-                found->callers[0], found->callers[1], found->callers[2], found->callers[3]);
+            OSReport("[VK 24P]   %s block %08x %d KiB, by %08x %08x %08x %08x %08x %08x %08x %08x\n", what, data,
+                block->size >> 10, found->callers[0], found->callers[1], found->callers[2], found->callers[3],
+                found->callers[4], found->callers[5], found->callers[6], found->callers[7]);
         }
         else OSReport("[VK 24P]   %s block %08x %d KiB, allocated before the report started\n", what, data, block->size >> 10);
     }
