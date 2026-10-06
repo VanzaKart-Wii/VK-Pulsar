@@ -174,10 +174,12 @@ static s32 LocalIdForSelect(const RKNet::Controller* controller, s32 index) {
     return -1;
 }
 static const WordPatch words[] ={
+    { 0x80660094, 0x2803000b, 0x28030017 },
     { 0x80660994, 0x2803000b, 0x28030017 },
 };
 
 static const CallPatch calls[] ={
+    { 0x80660090, 0x4bff9cc9, reinterpret_cast<const void*>(LocalIdForSelect), false },
     { 0x80660990, 0x4bff93c9, reinterpret_cast<const void*>(LocalIdForSelect), false },
     { 0x80661498, 0x48000b9d, reinterpret_cast<const void*>(AllocatePlayerIds), false },
     { 0x805fa930, 0x80630004, reinterpret_cast<const void*>(GetMiiChecked), true },
