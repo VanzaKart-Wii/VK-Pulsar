@@ -120,6 +120,16 @@ static void BubbleY(HookRegs& regs, u32) {
     *reinterpret_cast<float*>(regs.gpr[3] + 0x30) = bubbleY + offset;
 }
 
+static const u32 friendsCountOffset = 0x2670;
+static const u32 friendsCapacity = 10;
+static void FriendCandidates(HookRegs& regs, u32) {
+    const u32 count = *reinterpret_cast<const u32*>(regs.gpr[22] + friendsCountOffset);
+    regs.gpr[0] = count >= friendsCapacity ? 0 : *reinterpret_cast<const u32*>(regs.gpr[5] + 0x9e0);
+}
+static void FriendCandidateFlag(HookRegs& regs, u32) {
+    regs.gpr[0] = regs.gpr[4] < vanillaPlayers ? *reinterpret_cast<const u8*>(regs.gpr[3] + 0x2af9) : 0;
+}
+
 static const WordPatch words[] ={
     { 0x806241e4, 0x38602c68, 0x38600000 | pageSize },
     { 0x805d8964, 0x88032adc, 0x88030000 | orderOffset },
@@ -132,6 +142,7 @@ static const WordPatch words[] ={
     { 0x805da4f8, 0x88032adc, 0x88030000 | orderOffset },
     { 0x805dac80, 0x88042adc, 0x88040000 | orderOffset },
     { 0x805da6cc, 0x2813000c, 0x28130018 },
+    { 0x805dca70, 0x2817000c, 0x28170018 },
 };
 
 static const HookPatch hooks[] ={
@@ -151,6 +162,8 @@ static const HookPatch hooks[] ={
     { 0x805dac84, 0x5400fe3e, BubbleToAid, false },
     { 0x805daff8, 0x57440e3c, AidToBubble, false },
     { 0x805d978c, 0xd0230030, BubbleY, false },
+    { 0x805dc92c, 0x800509e0, FriendCandidates, false },
+    { 0x805dc93c, 0x88032af9, FriendCandidateFlag, false },
 };
 
 static PatchSet roomSet("Online 24 room", words, P24_COUNT(words), nullptr, 0, nullptr, 0, hooks, P24_COUNT(hooks),
