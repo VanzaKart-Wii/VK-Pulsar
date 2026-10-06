@@ -15,10 +15,16 @@ static void BalloonPlayerId(HookRegs& regs, u32) {
     regs.gpr[0] = (id >= 0 && id < vanillaPlayers) ? static_cast<u32>(id) : 0xFFFFFFFF;
 }
 
+static void ScreenEffectsId(HookRegs& regs, u32) {
+    const u8 id = *reinterpret_cast<const u8*>(regs.gpr[30] + 0x12e);
+    regs.gpr[0] = id < maxPlayers ? id % vanillaPlayers : id;
+}
+
 static const HookPatch hooks[] ={
     { 0x805ac644, 0x88030024, CameraRacerCount, false },
     { 0x805acf34, 0x88030024, CameraRacerCount, false },
     { 0x807f1ac8, 0x80030014, BalloonPlayerId, false },
+    { 0x8069075c, 0x881e012e, ScreenEffectsId, false },
 };
 
 static PatchSet presentationSet("Presentation 24", nullptr, 0, nullptr, 0, nullptr, 0, hooks, P24_COUNT(hooks),
