@@ -109,14 +109,10 @@ static bool ReadRacerName(u8 id, wchar_t* dst, u32 length) {
     }
     else {
         const RKNet::USERHandler* user = RKNet::USERHandler::sInstance;
-        if(user == nullptr) return false;
-        const u8* info = reinterpret_cast<const u8*>(&user->rflWifiInfo);
-        const u8 miiPerAid = info[0];
-        const u16 infoAid = *reinterpret_cast<const u16*>(info + 2);
-        const u8* buffer = *reinterpret_cast<const u8* const*>(info + 0xc);
-        if(buffer == nullptr || slot >= miiPerAid) return false;
-        const u32 entry = aid > infoAid ? aid - 1 : aid;
-        name = reinterpret_cast<const wchar_t*>(buffer + entry * (miiPerAid * 0x4c + 8) + slot * 0x4c + 8 + 2);
+        if(user == nullptr || slot >= 2 || (user->aidBitflag & (1 << aid)) == 0) return false;
+        const u8* packet = reinterpret_cast<const u8*>(&user->receivedPackets[aid].rflPacket);
+        if((*reinterpret_cast<const u32*>(packet) & (1 << slot)) == 0) return false;
+        name = reinterpret_cast<const wchar_t*>(packet + 8 + slot * 0x4c + 2);
     }
     if(name == nullptr || name[0] == 0) return false;
     u32 i = 0;
