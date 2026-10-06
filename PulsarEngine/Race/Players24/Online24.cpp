@@ -94,6 +94,8 @@ bool ShowsCharacter(u8 id) {
     return IsOnline24() && HasExtraRacers();
 }
 
+static const wchar_t defaultMiiName[] = L"Player";
+typedef bool (*IsDefaultMiiFunc)(const void* createId, u16* index);
 static bool ReadRacerName(u8 id, wchar_t* dst, u32 length) {
     if(dst == nullptr || length == 0 || !IsOnline24() || id >= maxPlayers || IsOnlineCPU(id)) return false;
     const RKNet::Controller* controller = RKNet::Controller::sInstance;
@@ -105,14 +107,16 @@ static bool ReadRacerName(u8 id, wchar_t* dst, u32 length) {
     if(aid == CurrentSub(*controller).localAid) {
         if(SectionMgr::sInstance == nullptr || SectionMgr::sInstance->sectionParams == nullptr) return false;
         const Mii* mii = SectionMgr::sInstance->sectionParams->localPlayerMiis.GetMii(slot);
-        if(mii != nullptr) name = mii->info.name;
+        if(mii != nullptr) name = mii->isUserMii ? defaultMiiName : mii->info.name;
     }
     else {
         const RKNet::USERHandler* user = RKNet::USERHandler::sInstance;
         if(user == nullptr || slot >= 2 || (user->aidBitflag & (1 << aid)) == 0) return false;
         const u8* packet = reinterpret_cast<const u8*>(&user->receivedPackets[aid].rflPacket);
         if((*reinterpret_cast<const u32*>(packet) & (1 << slot)) == 0) return false;
-        name = reinterpret_cast<const wchar_t*>(packet + 8 + slot * 0x4c + 2);
+        const u8* storeData = packet + 8 + slot * 0x4c;
+        const bool isDefault = reinterpret_cast<IsDefaultMiiFunc>(Port(0x800ca820))(storeData + 0x18, nullptr);
+        name = isDefault ? defaultMiiName : reinterpret_cast<const wchar_t*>(storeData + 2);
     }
     if(name == nullptr || name[0] == 0) return false;
     u32 i = 0;
