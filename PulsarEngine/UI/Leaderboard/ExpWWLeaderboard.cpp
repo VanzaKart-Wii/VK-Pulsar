@@ -14,6 +14,7 @@
 #include <Network/Rating/RatingManager.hpp>
 #include <Network/PacketExpansion.hpp>
 #include <UI/UI.hpp>
+#include <Race/Players24/Players24.hpp>
 #include <include/c_stdlib.h>
 #include <include/c_wchar.h>
 
@@ -249,8 +250,11 @@ void WWLeaderboardFillRows(Pages::WWLeaderboardUpdate* page) {
     const bool isBattle = IsBattleMode(raceScenario);
     if (isBattle) UpdateBattleScores(raceScenario, raceInfo);
 
-    // Same call the vanilla routine made here: this is what commits the new ratings.
-    raceData->menusScenario.UpdatePoints();
+    // Same call the vanilla routine made here: this is what commits the new ratings. Past 12 racers (online 24
+    // players room) the 24 players scoring instead (Race/Players24/Offline24Ports.cpp), as on the offline results
+    // page (Race/CommonRace.cpp): the original only writes finishPos and score of ids 0-11, and a racer past the
+    // 12th sent its previous rank of the race before and started last.
+    if (!Players24::UpdatePoints24(raceData->menusScenario)) raceData->menusScenario.UpdatePoints();
 
     u32 rowCount = static_cast<u32>(page->GetRowCount());
     const u32 playerCount = raceScenario.playerCount;
