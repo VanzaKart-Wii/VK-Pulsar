@@ -195,10 +195,37 @@ static void CheckQR2Record(HookRegs& regs, u32) {
 static const u8* lastDetailedHeap = nullptr;
 static const u8* watchedMem1 = nullptr;
 static u32 lowestMem1 = 0xFFFFFFFF;
+struct BigAlloc { u32 block; u32 size; u32 callers[4]; };
+static const u32 bigAllocCount = 64;
+static BigAlloc bigAllocs[bigAllocCount];
+static u32 bigAllocNext = 0;
+static void RecordBigAlloc(u32 block, u32 size, u32 sp) {
+    BigAlloc& record = bigAllocs[bigAllocNext++ % bigAllocCount];
+    record.block = block;
+    record.size = size;
+    GetCallers(sp, record.callers, 4);
+}
+static void ReportBigBlocks(const char* what, const u8* head) {
+    if(head == nullptr) return;
+    const BlockHead* block = *reinterpret_cast<BlockHead* const*>(head + 0x44);
+    for(u32 count = 0; block != nullptr && IsMem((u32)block) && count < 65536; block = block->next, ++count) {
+        if(block->size < 0x10000) continue;
+        const u32 data = (u32)block + 0x10;
+        const BigAlloc* found = nullptr;
+        for(u32 i = 0; i < bigAllocCount; ++i) if(bigAllocs[i].block == data) found = &bigAllocs[i];
+        if(found != nullptr) {
+            OSReport("[VK 24P]   %s block %08x %d KiB, by %08x %08x %08x %08x\n", what, data, block->size >> 10,
+                found->callers[0], found->callers[1], found->callers[2], found->callers[3]);
+        }
+        else OSReport("[VK 24P]   %s block %08x %d KiB, allocated before the report started\n", what, data, block->size >> 10);
+    }
+}
+
 static void CheckAllocResult(HookRegs& regs, u32) {
 #ifdef P24TEST
     if(regs.gpr[31] != 0) RecordAlloc(regs.gpr[31], regs.gpr[30], regs.gpr[1]);
 #endif
+    if(regs.gpr[31] != 0 && regs.gpr[30] >= 0x10000) RecordBigAlloc(regs.gpr[31], regs.gpr[30], regs.gpr[1]);
     if(regs.gpr[31] != 0 && regs.gpr[29] == (u32)watchedMem1) {
         u32 total, largest;
         GetFreeSpace(watchedMem1, total, largest);
@@ -214,6 +241,7 @@ static void CheckAllocResult(HookRegs& regs, u32) {
     if(head != lastDetailedHeap) {
         lastDetailedHeap = head;
         ReportUsedBlocks(head);
+        ReportBigBlocks("failing heap", head);
     }
 }
 static const u32 emptyHandle[2] ={ 0, 0 };
@@ -266,6 +294,7 @@ static void ReportSectionMemory() {
     const s32 lowest = lowestMem1 == 0xFFFFFFFF ? -1 : static_cast<s32>(lowestMem1 >> 10);
     OSReport("[VK 24P] section 0x%x: MEM1 heap %08x %d KiB free (largest %d), lowest since the last line %d KiB; MEM2 %d KiB free\n",
         sectionMgr->curSection->sectionId, (u32)mem1, total1 >> 10, largest1 >> 10, lowest, total2 >> 10);
+    ReportBigBlocks("MEM1", mem1);
     watchedMem1 = mem1;
     lowestMem1 = total1;
 }
