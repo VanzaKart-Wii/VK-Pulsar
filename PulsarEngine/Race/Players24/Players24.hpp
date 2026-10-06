@@ -22,6 +22,7 @@ inline bool IsVSMode(GameMode mode) { return mode == MODE_VS_RACE || mode == MOD
 void ApplyConsoles();
 void ApplyAidLayout();
 void ApplyOnlinePages();
+void ApplyRoomBubbles();
 
 const char* Layout24(const char* name);
 

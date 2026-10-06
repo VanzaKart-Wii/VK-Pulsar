@@ -473,6 +473,7 @@ static void ApplyAtBoot() {
     ApplyConsoles();
     ApplyAidLayout();
     ApplyOnlinePages();
+    ApplyRoomBubbles();
 }
 static BootHook Players24Racedata(ApplyAtBoot, 0);
 
