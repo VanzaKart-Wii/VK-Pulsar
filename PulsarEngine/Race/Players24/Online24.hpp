@@ -9,6 +9,8 @@ namespace Players24 {
 bool IsOnline24();
 bool IsConsoles24();
 bool HasNoMiiSlot(u8 id);
+bool ShowsCharacter(u8 id);
+bool GetRacerName(u8 id, wchar_t* dst, u32 length);
 bool CanHostRoom24();
 bool IsHostingRoom24();
 bool HostPlayers24Bit();

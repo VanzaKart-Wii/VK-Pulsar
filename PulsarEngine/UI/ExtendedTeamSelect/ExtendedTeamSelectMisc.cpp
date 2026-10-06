@@ -248,10 +248,23 @@ void CtrlRaceNameBalloon_PlayAnimationAtFrameAndDisable(AnimationGroup* _this, u
     rebuilt from the Mii as one BMG_TEXT string, see Rank::ComposeRaceName. The control
     keeps the displayed player at 0x178, nameSlotId.
 */
-static wchar_t sBalloonNames[12][64];
+static wchar_t sBalloonNames[24][64]; //24 racers in the online 24 players rooms
 
 void CtrlRaceNameBalloon_SetName(CtrlRaceNameBalloon* _this, const char* paneName, u32 bmgId, const Text::Info* info) {
     const u32 playerId = _this->nameSlotId;
+    /*
+        Online past 12 racers every balloon is in character style (Race/Players24/Online24.cpp, ShowsCharacter),
+        which writes the character's name: the player's goes in instead, with its badge where the Mii has a slot.
+    */
+    if (playerId < 24 && Pulsar::Players24::ShowsCharacter((u8)playerId)) {
+        if ((playerId < 12 && PointRating::Rank::ComposeRaceName((u8)playerId, sBalloonNames[playerId], 64)) ||
+            Pulsar::Players24::GetRacerName((u8)playerId, sBalloonNames[playerId], 64)) {
+            Text::Info nameInfo;
+            nameInfo.strings[0] = sBalloonNames[playerId];
+            _this->SetTextBoxMessage(paneName, BMG_TEXT, &nameInfo);
+            return;
+        }
+    }
     if (info != nullptr && info->miis[0] != nullptr && playerId < 12 &&
         PointRating::Rank::ComposeRaceName((u8)playerId, sBalloonNames[playerId], 64)) {
         Text::Info rankedInfo;

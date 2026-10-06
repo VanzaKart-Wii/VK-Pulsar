@@ -16,6 +16,9 @@
 #include <Race/Players24/Online24.hpp>
 #include <Network/PacketExpansion.hpp>
 #include <Settings/Settings.hpp>
+#include <MarioKartWii/RKNet/USER.hpp>
+#include <MarioKartWii/UI/Text/Text.hpp>
+#include <UI/UI.hpp>
 
 extern "C" void OSReport(const char* format, ...);
 
@@ -84,6 +87,39 @@ bool IsConsoles24() { return cpusPerConsole == 0 && IsOnline24(); }
 bool HasNoMiiSlot(u8 id) {
     if(!IsOnline24() || id >= maxPlayers) return false;
     return id >= vanillaPlayers || IsOnlineCPU(id);
+}
+
+bool ShowsCharacter(u8 id) {
+    if(HasNoMiiSlot(id)) return true;
+    return IsOnline24() && HasExtraRacers();
+}
+
+typedef s32 (*WiFiInfo2RawFunc)(RFL::StoreData* dest, const RFL::WiFiInformation* info, u16 aid, u32 idx);
+bool GetRacerName(u8 id, wchar_t* dst, u32 length) {
+    if(dst == nullptr || length == 0 || !IsOnline24() || id >= maxPlayers || IsOnlineCPU(id)) return false;
+    const RKNet::Controller* controller = RKNet::Controller::sInstance;
+    const u8 aid = AidOfPlayer(id);
+    if(controller == nullptr || aid >= maxPlayers) return false;
+    u8 slot = 0;
+    for(u8 other = 0; other < id; ++other) if(AidOfPlayer(other) == aid) ++slot;
+    const wchar_t* name = nullptr;
+    RFL::StoreData store;
+    if(aid == CurrentSub(*controller).localAid) {
+        if(SectionMgr::sInstance == nullptr || SectionMgr::sInstance->sectionParams == nullptr) return false;
+        const Mii* mii = SectionMgr::sInstance->sectionParams->localPlayerMiis.GetMii(slot);
+        if(mii != nullptr) name = mii->info.name;
+    }
+    else {
+        RKNet::USERHandler* user = RKNet::USERHandler::sInstance;
+        if(user != nullptr && reinterpret_cast<WiFiInfo2RawFunc>(Port(0x800cc6f0))(&store, &user->rflWifiInfo, aid, slot) == 0) {
+            name = store.miiName;
+        }
+    }
+    if(name == nullptr || name[0] == 0) return false;
+    u32 i = 0;
+    for(; i + 1 < length && i < 10 && name[i] != 0; ++i) dst[i] = name[i];
+    dst[i] = 0;
+    return true;
 }
 
 bool CanHostRoom24() {
@@ -366,13 +402,13 @@ static void CPUNameInResults(HookRegs& regs, u32 original) {
 }
 
 static void CharacterIconForCPU(HookRegs& regs, u32 original, u8 id) {
-    regs.gpr[RegD(original)] = HasNoMiiSlot(id) ? 0 : 1;
+    regs.gpr[RegD(original)] = ShowsCharacter(id) ? 0 : 1;
 }
 static void ResultIconForCPU(HookRegs& regs, u32 original) { CharacterIconForCPU(regs, original, regs.gpr[30]); }
 static void TotalIconForCPU(HookRegs& regs, u32 original) { CharacterIconForCPU(regs, original, regs.gpr[28]); }
 static void NoBalloonForCPU(HookRegs& regs, u32 original) {
     u32 type = *reinterpret_cast<const u32*>(regs.gpr[RegA(original)] + static_cast<s16>(original & 0xFFFF));
-    if(HasNoMiiSlot(regs.gpr[30])) type = PLAYER_CPU;
+    if(ShowsCharacter(regs.gpr[30])) type = PLAYER_CPU;
     regs.gpr[RegD(original)] = type;
 }
 
@@ -386,7 +422,7 @@ static void WifiResultIcon(HookRegs& regs, u32) {
     void* control = reinterpret_cast<void*>(regs.gpr[3]);
     const char* pane = reinterpret_cast<const char*>(regs.gpr[4]);
     const u8 id = regs.gpr[29];
-    if(HasNoMiiSlot(id)) {
+    if(ShowsCharacter(id)) {
         const char* texture = reinterpret_cast<CharacterIconFunc>(Port(0x80860acc))(CharacterOf(id));
         reinterpret_cast<SetPictureFunc>(Port(0x8063e0f0))(control, pane, texture);
     }
@@ -397,7 +433,13 @@ static void WifiResultName(HookRegs& regs, u32) {
     void* control = reinterpret_cast<void*>(regs.gpr[3]);
     const char* pane = reinterpret_cast<const char*>(regs.gpr[4]);
     const u8 id = regs.gpr[29];
-    if(HasNoMiiSlot(id)) {
+    static wchar_t names[maxPlayers][16];
+    if(GetRacerName(id, names[id], 16) && (id >= vanillaPlayers || ShowsCharacter(id))) {
+        Text::Info info;
+        info.strings[0] = names[id];
+        reinterpret_cast<SetTextBoxMessageFunc>(Port(0x8063dcbc))(control, pane, UI::BMG_TEXT, &info);
+    }
+    else if(HasNoMiiSlot(id)) {
         const u32 bmgId = reinterpret_cast<CharacterBmgFunc>(Port(0x80833774))(CharacterOf(id), 1);
         reinterpret_cast<SetTextBoxMessageFunc>(Port(0x8063dcbc))(control, pane, bmgId, nullptr);
     }
