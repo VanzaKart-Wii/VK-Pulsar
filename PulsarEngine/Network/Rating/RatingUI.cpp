@@ -62,7 +62,7 @@ static float GetRatingForDisplay(Pages::SELECTStageMgr* mgr, u32 playerId, bool 
     }
     u8 aid = mgr->infos[playerId].aid;
     u8 slot = mgr->infos[playerId].hudSlotid;
-    if (aid < 12 && slot < 2) {
+    if (aid < 24 && slot < 2) {
         *hasDecimal = true;
         float base = (float)(isBR ? mgr->infos[playerId].br : mgr->infos[playerId].vr);
         return base + (float)remoteDecimalVR[aid][slot] / 100.0f;

@@ -56,7 +56,7 @@ void ClearPayload(Network::PulSELECT* packet) {
 }
 
 void CacheRemotePayload(u8 aid, const Network::PulSELECT* packet) {
-    if (packet == nullptr || aid >= 12) return;
+    if (packet == nullptr || aid >= 24) return; //aids 12-23 in the online 24 players rooms
     Rank::CacheRemote(aid, packet->prestigeRank);
     remoteDecimalVR[aid][0] = packet->decimalVR[0];
     remoteDecimalVR[aid][1] = packet->decimalVR[1];

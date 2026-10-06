@@ -18,7 +18,7 @@ namespace PointRating {
 
 // Fractional VR of remote players, indexed by [aid][slot on that console]. Filled by
 // PulSELECT reception; the integer part rides the vanilla rating field.
-u8 remoteDecimalVR[12][2];
+u8 remoteDecimalVR[24][2];
 
 // Signed variation of the last race, consumed by the end-of-race leaderboard.
 float lastRaceDeltas[12];

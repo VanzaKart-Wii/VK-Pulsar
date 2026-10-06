@@ -43,7 +43,7 @@ u32 GetPlayerPrestigeRank(u8 playerId);
 
 // Fractional VR of remote players, [aid][slot]; the integer part rides the vanilla
 // rating field. Signed variation of the last race, per player id.
-extern u8 remoteDecimalVR[12][2];
+extern u8 remoteDecimalVR[24][2]; //24 aids in the online 24 players rooms
 extern float lastRaceDeltas[12];
 
 // ------------------------------------------------------------------ display

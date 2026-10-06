@@ -67,7 +67,7 @@ Role GetLocal(u8 playerIndexOnConsole) {
 }
 
 Role GetRemote(u8 aid, u8 playerIndexOnConsole) {
-    if (aid >= 12 || playerIndexOnConsole != 0) return ROLE_NONE;
+    if (aid >= 24 || playerIndexOnConsole != 0) return ROLE_NONE;
     const DWC::MatchControl* match = DWC::MatchControl::sInstance;
     if (match == nullptr) return ROLE_NONE;
     for (u32 i = 0; i < 32; ++i) {

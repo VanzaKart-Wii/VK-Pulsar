@@ -12,7 +12,7 @@ namespace Pulsar {
 namespace PointRating {
 namespace Rank {
 
-static RankId sRemoteRanks[12][2];
+static RankId sRemoteRanks[24][2]; //aids 12-23 in the online 24 players rooms
 
 RankId Resolve(RatingValue rating, RankId currentRank) {
     RankId rank = (currentRank <= Config::MAX_RANK) ? currentRank : Config::MAX_RANK;
@@ -31,13 +31,13 @@ RankId GetLocal(u32 licenseId) {
 }
 
 RankId GetRemote(u8 aid, u8 playerIndexOnConsole) {
-    if (aid >= 12 || playerIndexOnConsole >= 2) return 0;
+    if (aid >= 24 || playerIndexOnConsole >= 2) return 0;
     const RankId rank = sRemoteRanks[aid][playerIndexOnConsole];
     return (rank <= Config::MAX_RANK) ? rank : 0;
 }
 
 void CacheRemote(u8 aid, const u8 ranks[2]) {
-    if (aid >= 12 || ranks == nullptr) return;
+    if (aid >= 24 || ranks == nullptr) return;
     for (u8 i = 0; i < 2; ++i) {
         sRemoteRanks[aid][i] = (ranks[i] <= Config::MAX_RANK) ? ranks[i] : 0;
     }
