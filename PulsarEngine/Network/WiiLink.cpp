@@ -24,8 +24,8 @@ The payload runs from this block and patches the game with relative bl instructi
 reach +-32 MB: the block has to be in MEM1, next to the game's code. From June to October it came
 from the system heap, which sometimes placed it in MEM2 (0x9357xxxx): the login then crashed in the
 network thread, jumping from 800d879c (bl qr2_parse_query, patched by the payload) to 0x7F57xxxx,
-the MEM2 target cut to 26 bits. The root MEM1 heap has no 128 KB left at login, so it is static
-again, in Pulsar's own memory (as before June).
+the MEM2 target cut to 26 bits. The root MEM1 heap has no room left at login, so it is static
+again, in Pulsar's own memory (as before June), sized in WiiLink.hpp.
 */
 static u8 s_payloadBlock[PAYLOAD_BLOCK_SIZE + 0x20];
 static void *s_payload = nullptr;
@@ -207,8 +207,10 @@ s32 HandleResponse(u8 *block) {
 
     if (payload->header.total_size < sizeof(wwfc_payload) ||
         payload->header.total_size > PAYLOAD_BLOCK_SIZE) {
+        OS::Report("[VK WWFC] payload size 0x%x does not fit the 0x%x block\n", payload->header.total_size, PAYLOAD_BLOCK_SIZE);
         return WL_ERROR_PAYLOAD_STAGE1_LENGTH_ERROR;
     }
+    OS::Report("[VK WWFC] payload size 0x%x of 0x%x\n", payload->header.total_size, PAYLOAD_BLOCK_SIZE);
 
     if (memcmp(payload->salt, s_saltHash, SHA256_DIGEST_SIZE) != 0) {
         return WL_ERROR_PAYLOAD_STAGE1_SALT_MISMATCH;
@@ -228,7 +230,7 @@ s32 HandleResponse(u8 *block) {
     }
 
     // Flush data cache and invalidate instruction cache
-    for (register u32 i = 0; i < 0x20000; i += 0x20) {
+    for (register u32 i = 0; i < PAYLOAD_BLOCK_SIZE; i += 0x20) {
         asm(dcbf i, payload; sync; icbi i, payload; isync;);
     }
     s32 (*entryFunction)(wwfc_payload *) =

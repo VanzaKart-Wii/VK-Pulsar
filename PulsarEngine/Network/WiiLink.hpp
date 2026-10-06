@@ -44,7 +44,13 @@
 #  define WWFC_FALLBACK_FLAG_URL "http://vanzakart.net:8000/VanzaKart/fallback.txt"
 #endif
 
-#define PAYLOAD_BLOCK_SIZE 0x20000
+/*
+    The payload's image, its bss included, is header.total_size bytes: 0x69d8 from nas.vanzakart.net on
+    06/10/2026. The block lives in MEM1 for the whole session, and from the Riivolution launcher (a real
+    Wii) MEM1 has ~800 KiB less, so it is not the 128 KiB of the WiiLink loader. A bigger payload is
+    refused with WL_ERROR_PAYLOAD_STAGE1_LENGTH_ERROR, and the log names both sizes.
+*/
+#define PAYLOAD_BLOCK_SIZE 0xC000
 
 /*
     Which server this session ended up on. Null until a payload has been accepted, so a

@@ -3,6 +3,8 @@
 #include <Race/Players24/Patches.hpp>
 
 #include <core/rvl/OS/OSCache.hpp>
+#include <core/RK/RKSystem.hpp>
+#include <core/egg/mem/Heap.hpp>
 
 extern "C" void OSReport(const char* format, ...);
 extern "C" void ICInvalidateRange(void* addr, u32 size);
@@ -27,8 +29,11 @@ static bool InBranchRange(u32 from, u32 to) {
     return delta >= -0x02000000 && delta <= 0x01FFFFFC;
 }
 
-static const u32 stubWords = 64;
-static const u32 maxHooks = 128;
+static const u32 stubWords = 16;
+static const u32 maxHooks = 160;
+static const u32 commonWords = 64;
+static u32 hookCommon[commonWords];
+static bool isHookCommonBuilt = false;
 static u32 hookPool[maxHooks * stubWords];
 static u32 hookPoolUsed = 0;
 static const u32 maxTrampolines = 32;
@@ -99,43 +104,62 @@ bool SameInstruction(u32 palAddress, u32 palWord, u32 address, u32 word, bool da
     return dataHalf && IsDForm(palWord) && (palWord & 0xFFFF0000) == (word & 0xFFFF0000);
 }
 
+static const u32 hookFrame = 0x120;
+static void BuildHookCommon() {
+    u32* code = hookCommon;
+    u32 i = 0;
+    code[i++] = Stw(2, 0x18, 1);
+    code[i++] = DForm(47, 3, 1, 0x1C);
+    code[i++] = Addi(0, 1, hookFrame);
+    code[i++] = Stw(0, 0x14, 1);
+    code[i++] = 0x7C000026;
+    code[i++] = Stw(0, 0x90, 1);
+    code[i++] = MfSpr(0, 9);
+    code[i++] = Stw(0, 0x94, 1);
+    code[i++] = MfSpr(0, 1);
+    code[i++] = Stw(0, 0x98, 1);
+    for(u32 f = 0; f < 14; ++f) code[i++] = DForm(54, f, 1, 0xA0 + f * 8);
+    code[i++] = MfSpr(5, 8);
+    code[i++] = Stw(5, 0x110, 1);
+    code[i++] = Lwz(12, 0, 5);
+    code[i++] = Lwz(4, 4, 5);
+    code[i++] = MtSpr(9, 12);
+    code[i++] = Addi(3, 1, 0x10);
+    code[i++] = 0x4E800421;
+    for(u32 f = 0; f < 14; ++f) code[i++] = DForm(50, f, 1, 0xA0 + f * 8);
+    code[i++] = Lwz(0, 0x94, 1);
+    code[i++] = MtSpr(9, 0);
+    code[i++] = Lwz(0, 0x98, 1);
+    code[i++] = MtSpr(1, 0);
+    code[i++] = Lwz(0, 0x90, 1);
+    code[i++] = 0x7C0FF120;
+    code[i++] = Lwz(5, 0x110, 1);
+    code[i++] = Addi(0, 5, 8);
+    code[i++] = MtSpr(8, 0);
+    code[i++] = DForm(46, 3, 1, 0x1C);
+    code[i++] = Lwz(2, 0x18, 1);
+    code[i++] = 0x4E800020;
+    OS::DCFlushRange(code, commonWords * 4);
+    ICInvalidateRange(code, commonWords * 4);
+    isHookCommonBuilt = true;
+}
+
 static u32* BuildHookStub(const HookPatch& hook, u32 address, u32 original) {
+    if(!isHookCommonBuilt) BuildHookCommon();
     u32* stub = &hookPool[hookPoolUsed * stubWords];
     ++hookPoolUsed;
-    const u32 frame = 0x120;
     u32 i = 0;
-    stub[i++] = DForm(37, 1, 1, -(s32)frame);
+    stub[i++] = DForm(37, 1, 1, -(s32)hookFrame);
     stub[i++] = Stw(0, 0x10, 1);
-    stub[i++] = Stw(2, 0x18, 1);
-    stub[i++] = DForm(47, 3, 1, 0x1C);
-    stub[i++] = Addi(0, 1, frame);
-    stub[i++] = Stw(0, 0x14, 1);
-    stub[i++] = 0x7C000026;
-    stub[i++] = Stw(0, 0x90, 1);
-    stub[i++] = MfSpr(0, 9);
-    stub[i++] = Stw(0, 0x94, 1);
-    stub[i++] = MfSpr(0, 1);
-    stub[i++] = Stw(0, 0x98, 1);
     stub[i++] = MfSpr(0, 8);
     stub[i++] = Stw(0, 0x9C, 1);
-    for(u32 f = 0; f < 14; ++f) stub[i++] = DForm(54, f, 1, 0xA0 + f * 8);
-    stub[i++] = Addi(3, 1, 0x10);
-    stub[i++] = DForm(15, 4, 0, (s32)(original >> 16));
-    stub[i++] = DForm(24, 4, 4, (s32)(original & 0xFFFF));
-    stub[i] = Branch((u32)&stub[i], (u32)hook.handler, true); ++i;
-    for(u32 f = 0; f < 14; ++f) stub[i++] = DForm(50, f, 1, 0xA0 + f * 8);
+    stub[i] = Branch((u32)&stub[i], (u32)hookCommon, true); ++i;
+    stub[i++] = (u32)hook.handler;
+    stub[i++] = original;
     stub[i++] = Lwz(0, 0x9C, 1);
     stub[i++] = MtSpr(8, 0);
-    stub[i++] = Lwz(0, 0x98, 1);
-    stub[i++] = MtSpr(1, 0);
-    stub[i++] = Lwz(0, 0x94, 1);
-    stub[i++] = MtSpr(9, 0);
-    stub[i++] = Lwz(0, 0x90, 1);
-    stub[i++] = 0x7C0FF120;
-    stub[i++] = DForm(46, 3, 1, 0x1C);
-    stub[i++] = Lwz(2, 0x18, 1);
     stub[i++] = Lwz(0, 0x10, 1);
-    stub[i++] = Addi(1, 1, frame);
+    stub[i++] = Addi(1, 1, hookFrame);
     if(!hook.runOriginal) stub[i] = 0x60000000;
     else if(IsBranch(original)) stub[i] = Branch((u32)&stub[i], BranchTarget(address, original), original & 1);
     else stub[i] = original;
@@ -208,10 +232,11 @@ bool PatchSet::Check() const {
     return true;
 }
 
-static u32 allAddresses[4096];
+static const u32 maxAddresses = 4096;
+static u32* allAddresses = nullptr;
 static u32 addressCount = 0;
 static bool AddAddress(u32 address) {
-    if(addressCount >= sizeof(allAddresses) / sizeof(u32)) return false;
+    if(addressCount >= maxAddresses) return false;
     u32 i = addressCount++;
     while(i > 0 && allAddresses[i - 1] > address) {
         allAddresses[i] = allAddresses[i - 1];
@@ -222,6 +247,13 @@ static bool AddAddress(u32 address) {
 }
 
 bool PatchSet::CheckOverlaps(const u32* extra, u32 extraCount) {
+    EGG::Heap* heap = RKSystem::mInstance.EGGSystem;
+    allAddresses = nullptr;
+    if(heap != nullptr) allAddresses = static_cast<u32*>(EGG::Heap::alloc(maxAddresses * sizeof(u32), -4, heap));
+    if(allAddresses == nullptr) {
+        OSReport("[VK 24P] no memory to check the patched addresses\n");
+        return false;
+    }
     addressCount = 0;
     bool ok = true;
     for(u32 i = 0; i < extraCount; ++i) ok &= AddAddress(extra[i]);
@@ -231,17 +263,16 @@ bool PatchSet::CheckOverlaps(const u32* extra, u32 extraCount) {
         for(u32 i = 0; i < set->hookCount; ++i) ok &= AddAddress(set->hooks[i].address);
         for(u32 i = 0; i < set->funcCount; ++i) ok &= AddAddress(set->funcs[i].address);
     }
-    if(!ok) {
-        OSReport("[VK 24P] too many patched addresses to check\n");
-        return false;
-    }
-    for(u32 i = 1; i < addressCount; ++i) {
+    if(!ok) OSReport("[VK 24P] too many patched addresses to check\n");
+    for(u32 i = 1; ok && i < addressCount; ++i) {
         if(allAddresses[i] == allAddresses[i - 1]) {
             OSReport("[VK 24P] %08x is patched twice\n", allAddresses[i]);
-            return false;
+            ok = false;
         }
     }
-    return true;
+    EGG::Heap::free(allAddresses, heap);
+    allAddresses = nullptr;
+    return ok;
 }
 
 void PatchSet::Apply() const {

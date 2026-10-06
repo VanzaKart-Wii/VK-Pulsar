@@ -1,6 +1,7 @@
 #include <kamek.hpp>
 #include <MarioKartWii/Scene/GameScene.hpp>
 #include <MarioKartWii/UI/Section/SectionMgr.hpp>
+#include <MarioKartWii/UI/Section/Section.hpp>
 #include <MarioKartWii/Mii/MiiGroup.hpp>
 #include <MarioKartWii/Race/RaceInfo/RaceInfo.hpp>
 #include <Race/Players24/Players24.hpp>
@@ -192,10 +193,17 @@ static void CheckQR2Record(HookRegs& regs, u32) {
 #endif
 
 static const u8* lastDetailedHeap = nullptr;
+static const u8* watchedMem1 = nullptr;
+static u32 lowestMem1 = 0xFFFFFFFF;
 static void CheckAllocResult(HookRegs& regs, u32) {
 #ifdef P24TEST
     if(regs.gpr[31] != 0) RecordAlloc(regs.gpr[31], regs.gpr[30], regs.gpr[1]);
 #endif
+    if(regs.gpr[31] != 0 && regs.gpr[29] == (u32)watchedMem1) {
+        u32 total, largest;
+        GetFreeSpace(watchedMem1, total, largest);
+        if(total < lowestMem1) lowestMem1 = total;
+    }
     if(regs.gpr[31] != 0) return;
     u32 callers[5];
     GetCallers(regs.gpr[1], callers, 5);
@@ -246,6 +254,22 @@ static void ReportSceneMemory() {
     OSReport("[VK 24P] race load: free MEM1 %d KiB, MEM2 %d KiB\n", total1 >> 10, total2 >> 10);
 }
 static RaceLoadHook raceMemoryReport(ReportSceneMemory);
+
+static void ReportSectionMemory() {
+    const GameScene* scene = GameScene::GetCurrent();
+    const SectionMgr* sectionMgr = SectionMgr::sInstance;
+    if(scene == nullptr || sectionMgr == nullptr || sectionMgr->curSection == nullptr) return;
+    const u8* mem1 = MemHead(scene->structsHeaps.heaps[0]);
+    u32 total1, largest1, total2, largest2;
+    GetFreeSpace(mem1, total1, largest1);
+    GetFreeSpace(MemHead(scene->structsHeaps.heaps[1]), total2, largest2);
+    const s32 lowest = lowestMem1 == 0xFFFFFFFF ? -1 : static_cast<s32>(lowestMem1 >> 10);
+    OSReport("[VK 24P] section 0x%x: MEM1 heap %08x %d KiB free (largest %d), lowest since the last line %d KiB; MEM2 %d KiB free\n",
+        sectionMgr->curSection->sectionId, (u32)mem1, total1 >> 10, largest1 >> 10, lowest, total2 >> 10);
+    watchedMem1 = mem1;
+    lowestMem1 = total1;
+}
+static SectionLoadHook sectionMemoryReport(ReportSectionMemory);
 
 #ifdef P24TEST
 static bool IsPhysicalRAM(u32 address) {
