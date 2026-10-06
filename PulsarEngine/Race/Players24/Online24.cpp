@@ -432,6 +432,7 @@ static void LogRacers() {
             info != nullptr ? info->position : 0, info != nullptr ? info->stateFlags : 0,
             words ? words[0] : 0, words ? words[1] : 0, words ? words[4] : 0);
     }
+    LogRaceSync();
 }
 static RaceFrameHook logRacers(LogRacers);
 

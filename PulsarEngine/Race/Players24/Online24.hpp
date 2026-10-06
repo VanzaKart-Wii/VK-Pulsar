@@ -24,6 +24,7 @@ void FillCPUSelectData(RKNet::SELECTPacket& packet);
 
 bool OnlineItemsReady();
 bool OnlineRaceReady();
+void LogRaceSync();
 
 }
 }

@@ -6,6 +6,8 @@
 #include <MarioKartWii/RKNet/PacketMgr.hpp>
 #include <Race/Players24/Online24.hpp>
 
+extern "C" void OSReport(const char* format, ...);
+
 namespace Pulsar {
 namespace Players24 {
 
@@ -98,9 +100,15 @@ static void Init(u8* gm) {
     memset(states, 0, sizeof(states));
     const u32 timerVtable = *reinterpret_cast<const u32*>(VanillaEntry(gm, 0));
     for(u8 id = 0; id < maxPlayers; ++id) states[id].finishTime.vtable = timerVtable;
+    const RacedataScenario& race = Racedata::sInstance->racesScenario;
+    u8& localIdCount = LocalIds(gm)[3];
+    for(u8 id = vanillaPlayers; id < saved && localIdCount < 2; ++id) {
+        if(GetPlayer(race, id).playerType == PLAYER_REAL_LOCAL) LocalIds(gm)[localIdCount++] = id;
+    }
     localRacerCount = 0;
     for(u8 i = 0; i < 2; ++i) if(LocalIds(gm)[i] != noPlayer) localRacers[localRacerCount++] = LocalIds(gm)[i];
-    const RacedataScenario& race = Racedata::sInstance->racesScenario;
+    OSReport("[VK 24P] online race: local ids %d %d (%d), racers %d\n", LocalIds(gm)[0], LocalIds(gm)[1], localIdCount,
+        saved);
     for(u8 id = 0; id < saved && localRacerCount < maxLocalRacers; ++id) {
         if(GetPlayer(race, id).playerType == PLAYER_CPU) localRacers[localRacerCount++] = id;
     }
@@ -325,6 +333,20 @@ static PatchSet raceSet("Online 24 race", nullptr, 0, calls, P24_COUNT(calls), n
     P24_COUNT(funcs), true);
 
 bool OnlineRaceReady() { return IsReady() && !raceSet.skipped; }
+
+void LogRaceSync() {
+    if(!IsOnline24() || Raceinfo::sInstance == nullptr) return;
+    const u8 count = RacerCount();
+    for(u8 id = 0; id < count && id < maxPlayers; ++id) {
+        if(IsLocalRacer(id)) {
+            OSReport("[VK 24P]   sync id %2d local\n", id);
+            continue;
+        }
+        const RacerState& state = states[id];
+        OSReport("[VK 24P]   sync id %2d time %d received %06x acknowledged %06x disconnected %06x\n", id,
+            state.finishTime.isActive, state.received, state.acknowledged, state.disconnected);
+    }
+}
 
 }
 }
