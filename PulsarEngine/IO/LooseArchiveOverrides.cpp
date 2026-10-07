@@ -191,7 +191,6 @@ struct StructuralChildRef {
 
 static OverrideDatabase sOverrideDatabase = {};
 static OverrideDatabase* sActiveOverrideDatabase = &sOverrideDatabase;
-static u8 sLoggedBRSARLayoutFailure[1024] = {};
 static bool sOverrideIndicesAttempted = false;
 static bool sHasWholeFileOverrides = false;
 static bool sModsRootChecked = false;
@@ -1322,26 +1321,10 @@ static bool ModsRootExists() {
     SetModsRootPath(kModsRoot);
     u32 modsIndex = 0;
     u32 modsEnd = 0;
-    const void* fst = OS::BootInfo::mInstance.FSTLocation;
-    const u32 fstCount = (fst != nullptr) ? static_cast<const FSTEntry*>(fst)[0].size : 0;
     sModsRootPresent = FindModsDirInFST(modsIndex, modsEnd);
-    OS::Report("[VK MODS] probe root='%s' FST=%p entries=%u foundInFST=%d\n",
-               kModsRoot, fst, fstCount, (int)sModsRootPresent);
-    if (fst != nullptr && fstCount > 1) {
-        const FSTEntry* e = static_cast<const FSTEntry*>(fst);
-        const char* names = reinterpret_cast<const char*>(fst) + fstCount * sizeof(FSTEntry);
-        u32 i = 1;
-        while (i < fstCount && i < 4000) {
-            const bool isDir = (e[i].typeName >> 24) != 0;
-            OS::Report("[VK FST] %s '%s'\n", isDir ? "DIR " : "file", names + (e[i].typeName & 0xFFFFFF));
-            i = isDir ? e[i].size : i + 1;
-        }
-    }
     if (!sModsRootPresent) {
         // Disc FST lookup is preferred; SD probing is only the fallback path.
         sModsRootPresent = ModsRootExistsOnSD();
-        IO* io = IO::sInstance;
-                   ((io != nullptr) ? (int)io->type : -1, (int)ShouldProbeSDModsPath(), (int)sModsRootPresent);
     }
     return sModsRootPresent;
 }
@@ -2191,11 +2174,6 @@ static bool BRSAROverrideMagicMatches(u8 type, const u8* header) {
     return false;
 }
 
-static bool ShouldLogBRSARLayoutFailure(u32 fileId) {
-    if (fileId >= kBRSAROverrideSlotCount || sLoggedBRSARLayoutFailure[fileId] != 0) return false;
-    sLoggedBRSARLayoutFailure[fileId] = 1;
-    return true;
-}
 
 static bool FindEmbeddedRWAROffset(DVD::FileInfo& info, const BRSAROverrideSlot& entry, u32 searchStart, u32& outOffset,
                                    u32& outSize) {
@@ -2291,10 +2269,6 @@ static bool TryGetCompressedBRSAROverrideLayout(u32 fileId, BRSAROverrideSlot& e
         ReadOverrideDataRange(entry.sourcePathOffset, entry.flags, entry.dataOffset, entryData, entry.size, 0);
     if (!readOk || !BRSAROverrideMagicMatches(entry.type, entryData)) {
         EGG::Heap::free(entryData, heap);
-        if (ShouldLogBRSARLayoutFailure(fileId)) {
-            OS::Report("[Pulsar] Loose BRSAR layout failed: fileId=%u path='%s' compressed member read failed\n",
-                       fileId, relativePath != nullptr ? relativePath : "<missing>");
-        }
         return false;
     }
 
@@ -2302,10 +2276,6 @@ static bool TryGetCompressedBRSAROverrideLayout(u32 fileId, BRSAROverrideSlot& e
     if (fileSize < 0x20 || fileSize > entry.size) {
         EGG::Heap::free(entryData, heap);
         entry.layoutState = 2;
-        if (ShouldLogBRSARLayoutFailure(fileId)) {
-            OS::Report("[Pulsar] Loose BRSAR layout failed: fileId=%u path='%s' invalid main size=0x%X entry=0x%X\n",
-                       fileId, relativePath != nullptr ? relativePath : "<missing>", fileSize, entry.size);
-        }
         return false;
     }
 
@@ -2348,19 +2318,11 @@ static bool TryGetBRSAROverrideLayout(u32 fileId, BRSAROverrideSlot& entry, BRSA
     char fullPath[OVERRIDE_MAX_PATH];
     if (relativePath == nullptr || !BuildStoredOverridePath(entry.sourcePathOffset, fullPath, sizeof(fullPath)) ||
         entry.size < 0x20) {
-        if (ShouldLogBRSARLayoutFailure(fileId)) {
-            OS::Report("[Pulsar] Loose BRSAR layout failed: fileId=%u path='%s' invalid file metadata size=0x%X\n",
-                       fileId, relativePath != nullptr ? relativePath : "<missing>", entry.size);
-        }
         return false;
     }
 
     DVD::FileInfo info;
     if (!DVD::Open(fullPath, &info)) {
-        if (ShouldLogBRSARLayoutFailure(fileId)) {
-            OS::Report("[Pulsar] Loose BRSAR layout failed: fileId=%u path='%s' header read failed\n", fileId,
-                       relativePath);
-        }
         return false;
     }
 
@@ -2368,18 +2330,10 @@ static bool TryGetBRSAROverrideLayout(u32 fileId, BRSAROverrideSlot& entry, BRSA
     const bool headerReadOk = ReadOpenedDVDFileRange(info, header, sizeof(header), entry.dataOffset);
     if (!headerReadOk) {
         DVD::Close(&info);
-        if (ShouldLogBRSARLayoutFailure(fileId)) {
-            OS::Report("[Pulsar] Loose BRSAR layout failed: fileId=%u path='%s' header read failed\n", fileId,
-                       relativePath);
-        }
         return false;
     }
     if (!BRSAROverrideMagicMatches(entry.type, header)) {
         DVD::Close(&info);
-        if (ShouldLogBRSARLayoutFailure(fileId)) {
-            OS::Report("[Pulsar] Loose BRSAR layout failed: fileId=%u path='%s' magic/type mismatch\n", fileId,
-                       relativePath);
-        }
         return false;
     }
 
@@ -2387,10 +2341,6 @@ static bool TryGetBRSAROverrideLayout(u32 fileId, BRSAROverrideSlot& entry, BRSA
     if (fileSize < 0x20 || fileSize > entry.size) {
         DVD::Close(&info);
         entry.layoutState = 2;
-        if (ShouldLogBRSARLayoutFailure(fileId)) {
-            OS::Report("[Pulsar] Loose BRSAR layout failed: fileId=%u path='%s' invalid main size=0x%X entry=0x%X\n",
-                       fileId, relativePath, fileSize, entry.size);
-        }
         return false;
     }
 
@@ -2506,18 +2456,6 @@ static void EnsureOverrideIndicesBuilt() {
     if (countState.brsarCount >= kMaxOverridesTotal) {
         countState.brsarTruncated = true;
     }
-    if (countState.taggedTruncated) {
-        OS::Report("[Pulsar] Loose tagged overrides truncated at %u entries (max %u)\n",
-                   countState.taggedCount, kMaxOverridesTotal);
-    }
-    if (countState.wholeFileTruncated) {
-        OS::Report("[Pulsar] Loose whole-file overrides truncated at %u entries (max %u)\n",
-                   countState.wholeFileCount, kMaxOverridesTotal);
-    }
-    if (countState.brsarTruncated) {
-        OS::Report("[Pulsar] Loose BRSAR overrides truncated at %u entries (max %u)\n",
-                   countState.brsarCount, kMaxOverridesTotal);
-    }
 
     if (countState.taggedCount == 0 && countState.wholeFileCount == 0 && countState.brsarCount == 0) {
         FreeOverrideDatabase(sOverrideDatabase);
@@ -2532,8 +2470,6 @@ static void EnsureOverrideIndicesBuilt() {
 
     EGG::Heap* databaseHeap = GetPersistentOverrideHeap(requiredSize);
     if (databaseHeap == nullptr) {
-        OS::Report("[Pulsar] Loose override database skipped: need 0x%X bytes, no persistent heap available\n",
-                   requiredSize);
         FreeOverrideDatabase(sOverrideDatabase);
         sHasWholeFileOverrides = false;
         return;
@@ -2541,7 +2477,6 @@ static void EnsureOverrideIndicesBuilt() {
 
     void* databaseBlock = EGG::Heap::alloc(requiredSize, 0x20, databaseHeap);
     if (databaseBlock == nullptr) {
-        OS::Report("[Pulsar] Loose override database allocation failed: size=0x%X\n", requiredSize);
         FreeOverrideDatabase(sOverrideDatabase);
         sHasWholeFileOverrides = false;
         return;
@@ -2579,8 +2514,6 @@ static void EnsureOverrideIndicesBuilt() {
     sOverrideDatabase = database;
     sActiveOverrideDatabase = &sOverrideDatabase;
     sHasWholeFileOverrides = (database.wholeFileEntries != nullptr && database.wholeFileCount > 0);
-    OS::Report("[Pulsar] Loose overrides database built successfully: tagged=%u, wholeFile=%u, brsar=%u\n",
-               database.taggedCount, database.wholeFileCount, database.brsarCount);
 }
 
 static bool ResolveLooseBRSAROverride(u32 fileId, BRSAROverrideSlot*& outEntry, BRSAROverrideLayout& outLayout) {
@@ -3123,14 +3056,11 @@ static bool RebuildArchiveWithStructuralOverrides(const char* archiveBaseLower, 
     if (tempHeap == nullptr) tempHeap = tempCandidates[2].heap;
     if (tempHeap == nullptr) tempHeap = sourceHeap;
     if (tempHeap == nullptr) {
-        OS::Report("[Pulsar] Structural rebuild early fail '%s': no temp heap\n", archiveBaseLower);
         return false;
     }
 
     const u32 oldNodeBytes = sizeof(U8Node) * nodeCount;
     if (header == nullptr || header->combinedNodeSize < oldNodeBytes) {
-        OS::Report("[Pulsar] Structural rebuild early fail '%s': bad header nodes=%u combined=0x%X\n",
-                   archiveBaseLower, nodeCount, header != nullptr ? header->combinedNodeSize : 0);
         return false;
     }
     const u32 nodeOffset = header->nodeOffset;
@@ -3139,14 +3069,11 @@ static bool RebuildArchiveWithStructuralOverrides(const char* archiveBaseLower, 
     const char* oldStringTable = reinterpret_cast<const char*>(nodes + nodeCount);
     if (!BuildStructuralAddedFiles(addCandidates, addCandidateCount, addedFiles, addCandidateCount, addedPathPool,
                                     addedPathPoolSize, addedNameBytes, oldStringTableSize, tempHeap)) {
-        OS::Report("[Pulsar] Structural rebuild early fail '%s': added file list\n", archiveBaseLower);
         return false;
     }
     if (addCandidateCount > 0) {
         addedFileEmitted = EGG::Heap::alloc<u8>(addCandidateCount, 0x20, tempHeap);
         if (addedFileEmitted == nullptr) {
-            OS::Report("[Pulsar] Structural rebuild early fail '%s': emitted flags count=%u\n", archiveBaseLower,
-                       addCandidateCount);
             FreeStructuralRebuildTemps(addedFiles, addedPathPool, addedFileEmitted, dirKeepFlags, tempHeap);
             return false;
         }
@@ -3155,7 +3082,6 @@ static bool RebuildArchiveWithStructuralOverrides(const char* archiveBaseLower, 
 
     dirKeepFlags = EGG::Heap::alloc<u8>(nodeCount, 0x20, tempHeap);
     if (dirKeepFlags == nullptr) {
-        OS::Report("[Pulsar] Structural rebuild early fail '%s': dir flags nodes=%u\n", archiveBaseLower, nodeCount);
         FreeStructuralRebuildTemps(addedFiles, addedPathPool, addedFileEmitted, dirKeepFlags, tempHeap);
         return false;
     }
@@ -3221,16 +3147,12 @@ static bool RebuildArchiveWithStructuralOverrides(const char* archiveBaseLower, 
     EGG::Heap* repackHeap = FindHeapWithSpace(candidates, candCount, newSize);
 
     if (repackHeap == nullptr) {
-        OS::Report("[Pulsar] Structural rebuild fail '%s': no separate heap for old=0x%X new=0x%X\n",
-                   archiveBaseLower, archiveSize, newSize);
         FreeStructuralRebuildTemps(addedFiles, addedPathPool, addedFileEmitted, dirKeepFlags, tempHeap);
         return false;
     }
 
     u8* newBuffer = static_cast<u8*>(EGG::Heap::alloc(newSize, 0x20, repackHeap));
     if (newBuffer == nullptr) {
-        OS::Report("[Pulsar] Structural loose override rebuild allocation failed for '%s': old=0x%X new=0x%X\n",
-                   archiveBaseLower, archiveSize, newSize);
         FreeStructuralRebuildTemps(addedFiles, addedPathPool, addedFileEmitted, dirKeepFlags, tempHeap);
         return false;
     }
@@ -3279,11 +3201,6 @@ static bool RebuildArchiveWithStructuralOverrides(const char* archiveBaseLower, 
 
     success = EmitStructuralRootNode(0, context) && context.nextNodeIndex == newNodeCount &&
               context.nextStringOffset == newStringTableSize;
-    if (!success) {
-        OS::Report("[Pulsar] Structural rebuild detail '%s': emitted=%u/%u strings=%u/%u write=0x%X/0x%X\n",
-                   archiveBaseLower, context.nextNodeIndex, newNodeCount, context.nextStringOffset, newStringTableSize,
-                   context.writeOffset, newSize);
-    }
     if (success) {
         const u32 finalSize = Align32(context.writeOffset);
         if (finalSize < newSize) {
@@ -3299,8 +3216,6 @@ static bool RebuildArchiveWithStructuralOverrides(const char* archiveBaseLower, 
         const u32 appliedOverrides = CountAppliedEntries(entryAppliedBits, taggedCandidates);
         SetOverrideResult(outAppliedOverrides, appliedOverrides, outPatchedNodes, context.patchedNodes,
                           outMissingOverrides, missingOverrides);
-        OS::Report("[Pulsar] Structural loose overrides applied for '%s': applied=%u patched=%u missing=%u\n",
-                   archiveBaseLower, appliedOverrides, context.patchedNodes, missingOverrides);
     } else {
         EGG::Heap::free(newBuffer, repackHeap);
     }
@@ -3643,10 +3558,6 @@ bool ApplyLooseOverrides(const char* archiveBaseLower, u8*& archiveBase, u32& ar
 
     if (!anyOverrides) {
         FreeStructuralMatchTemps(nodeDeleteFlags, structuralAddCandidates, structuralTempHeap);
-        if (missingOverrides > 0) {
-            OS::Report("[Pulsar] Loose overrides skipped for '%s': %u tagged file(s) did not match archive contents\n",
-                       archiveBaseLower, missingOverrides);
-        }
         SetOverrideResult(outAppliedOverrides, 0, outPatchedNodes, 0, outMissingOverrides, missingOverrides);
         return false;
     }
@@ -3656,10 +3567,6 @@ bool ApplyLooseOverrides(const char* archiveBaseLower, u8*& archiveBase, u32& ar
             archiveBaseLower, archiveBase, archiveSize, sourceHeap, archiveHeap, header, nodes, nodeCount, nodeOverrideIndex,
             nodeDeleteFlags, structuralAddCandidates, structuralAddCandidateCount, rangeStart, taggedCandidates,
             entryAppliedBits, missingOverrides, outAppliedOverrides, outPatchedNodes, outMissingOverrides);
-        if (!rebuilt) {
-            OS::Report("[Pulsar] Structural loose override rebuild failed for '%s': candidates=%u missing=%u\n",
-                       archiveBaseLower, structuralAddCandidateCount, missingOverrides);
-        }
         FreeStructuralMatchTemps(nodeDeleteFlags, structuralAddCandidates, structuralTempHeap);
         return rebuilt;
     }
@@ -3827,8 +3734,6 @@ bool ApplyLooseOverrides(const char* archiveBaseLower, u8*& archiveBase, u32& ar
         triedSourceHeap = true;
     }
     if (newBuffer == nullptr) {
-        OS::Report("[Pulsar] Loose override repack allocation failed for '%s': old=0x%X new=0x%X growth=0x%X%s\n",
-                   archiveBaseLower, archiveSize, newSize, growth, allowSourceHeap ? "" : " source-heap growth capped");
         if (archiveBase == nullptr && compressedData != nullptr) {
             // Same-heap repack may already have released the old archive, so rebuild the original before bailing out.
             archiveBase = static_cast<u8*>(EGG::Heap::alloc(originalArchiveSize, 0x20, sourceHeap));
@@ -3844,8 +3749,6 @@ bool ApplyLooseOverrides(const char* archiveBaseLower, u8*& archiveBase, u32& ar
             const u32 oversizedNodes =
                 CountInPlaceOversizedOverrides(fallbackNodes, nodeCount, nodeOverrideIndex, fileSlotCapacities);
             if (oversizedNodes > 0) {
-                OS::Report("[Pulsar] Loose override repack fallback rejected for '%s': oversized=%u missing=%u\n",
-                           archiveBaseLower, oversizedNodes, missingOverrides);
                 SetOverrideResult(outAppliedOverrides, 0, outPatchedNodes, 0, outMissingOverrides, missingOverrides);
                 return false;
             }
@@ -3855,8 +3758,6 @@ bool ApplyLooseOverrides(const char* archiveBaseLower, u8*& archiveBase, u32& ar
             const u32 appliedOverrides = CountAppliedEntries(entryAppliedBits, taggedCandidates);
 
             if (patchedNodes > 0) {
-                OS::Report("[Pulsar] Loose override repack fallback used for '%s': applied=%u patched=%u oversized=%u missing=%u\n",
-                           archiveBaseLower, appliedOverrides, patchedNodes, oversizedNodes, missingOverrides);
                 SetOverrideResult(outAppliedOverrides, appliedOverrides, outPatchedNodes, patchedNodes,
                                   outMissingOverrides, missingOverrides);
                 return true;
@@ -3930,8 +3831,6 @@ bool ApplyLooseOverrides(const char* archiveBaseLower, u8*& archiveBase, u32& ar
             if (writeOffset + alignedSize > newSize) {
                 const TaggedOverrideEntry& entry = sOverrideDatabase.taggedEntries[idx];
                 const char* relativePath = GetRelativePath(entry.sourcePathOffset);
-                OS::Report("[Pulsar] Loose override '%s' skipped in '%s': repack buffer too small for 0x%X bytes\n",
-                           relativePath != nullptr ? relativePath : "<missing>", archiveBaseLower, newFileSize);
                 // Recover by copying the original member instead of throwing away the entire repack.
                 useOverride = false;
                 newFileSize = oldSize;
@@ -3967,8 +3866,6 @@ bool ApplyLooseOverrides(const char* archiveBaseLower, u8*& archiveBase, u32& ar
 
     const u32 appliedOverrides = CountAppliedEntries(entryAppliedBits, taggedCandidates);
     if (repackPartialFailure) {
-        OS::Report("[Pulsar] Loose override repack incomplete for '%s': applied=%u patched=%u missing=%u\n",
-                   archiveBaseLower, appliedOverrides, patchedNodes, missingOverrides);
         if (useSameHeapRepack && compressedData != nullptr) {
             EGG::Decomp::decodeSZS(const_cast<u8*>(compressedData), newBuffer);
             if (newSize > originalArchiveSize) {

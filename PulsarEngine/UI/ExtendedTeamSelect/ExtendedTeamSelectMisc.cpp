@@ -16,7 +16,6 @@
 #include <Network/Rating/RankManager.hpp>
 #include <Race/Players24/Online24.hpp>
 
-extern "C" void OSReport(const char* format, ...);
 
 namespace Pulsar {
 namespace UI {
@@ -45,8 +44,6 @@ void PrepareOnlinePages(Pages::FriendRoomWaiting* _this) {
         }
     }
     PageId nextPageId = PAGE_CHARACTER_SELECT;
-    OSReport("[Pulsar LOG] PrepareOnlinePages: context=0x%08X, PULSAR_EXTENDEDTEAMS=%d, IsContext=%d, startedGameMode=%d\n",
-             System::sInstance->GetContext(), PULSAR_EXTENDEDTEAMS, System::sInstance->IsContext(PULSAR_EXTENDEDTEAMS), friendRoomManager ? friendRoomManager->startedGameMode : -1);
     if (System::sInstance->IsContext(PULSAR_EXTENDEDTEAMS) && (friendRoomManager->startedGameMode == 0 || friendRoomManager->startedGameMode == 2 || friendRoomManager->startedGameMode == 3)) {
         _this->countdown.SetInitial(86400.0f);
         nextPageId = static_cast<PageId>(PULPAGE_EXTENDEDTEAMSELECT);

@@ -13,7 +13,6 @@ namespace Race {
 static bool isGivenItem;
 void restartItem(){
     isGivenItem = false;
-    OS::Report("[TEST LOG DIO CANE]PulsarEngine: removing item from player 1 for TT\n", 0);
 }
 void itemOnTT(){
     bool isTT = DriverMgr::isTT;
