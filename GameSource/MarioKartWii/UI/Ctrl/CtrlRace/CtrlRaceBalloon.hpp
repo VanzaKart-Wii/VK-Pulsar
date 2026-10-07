@@ -44,7 +44,6 @@ public:
     void UpdateInfo(u8 hudSlotId); //807f0044
     void UpdatePosition(u8 nameSlotId); //807f1094
 
-    u8 unknown_0x174[0x17C - 0x174];
     bool isOnline; //0x174
     u8 hudSlotId; //0x175
     u8 playerCount; //0x176
@@ -54,6 +53,7 @@ public:
     nw4r::lyt::Pane* chase_name_null; //0x180
     nw4r::lyt::Pane* line; //0x184
 }; //total size 0x188
+size_assert(CtrlRaceNameBalloon, 0x188); //808588cc writes 0x174, 0x178 (-1) and 0x17c
 
 class CtrlRaceItemBalloon : public LayoutUIControl {
     CtrlRaceItemBalloon(); //8085891c
