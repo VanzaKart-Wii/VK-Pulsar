@@ -330,7 +330,6 @@ typedef void (*MenuDataSetupFunc)(void* r3, void* r4, void* r5, void* r6);
 static void* menuDataSetupOriginal = nullptr;
 static void MenuDataSetup(void* r3, void* r4, void* r5, void* r6) {
     reinterpret_cast<MenuDataSetupFunc>(menuDataSetupOriginal)(r3, r4, r5, r6);
-    LoadRacerMiis();
     if(!IsOnline24()) return;
     CacheRacerNames();
     const RKNet::Controller* controller = RKNet::Controller::sInstance;
