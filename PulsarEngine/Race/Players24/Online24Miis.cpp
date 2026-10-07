@@ -7,13 +7,14 @@
 #include <MarioKartWii/UI/Section/SectionMgr.hpp>
 #include <core/egg/mem/Heap.hpp>
 #include <Network/Rating/StaffBadge.hpp>
+#include <MarioKartWii/RKNet/RKNetController.hpp>
 
 namespace Pulsar {
 namespace Players24 {
 
-static const u32 playerMiisTextures = 0x24;
-static const u32 extraMiisSize = 0x16000;
-static const u32 extraMiisMargin = 0x100000;
+static const u32 extraMiisTextures = 0x4;
+static const u32 extraMiisSize = 0x10000;
+static const u32 extraMiisMargin = 0x120000 + 0x200000;
 static MiiGroup* extraMiis = nullptr;
 static u32 extraMiisLoaded = 0;
 static bool MiisSetReady();
@@ -35,6 +36,17 @@ typedef void (*PlayerMiiFunc)(MiiGroup* group, u32 idx, u32 aid, u32 slot);
 
 extern "C" void OSReport(const char* format, ...);
 
+#ifdef P24TEST
+void ReportRaceMemory(const char* step) {
+    const GameScene* scene = GameScene::GetCurrent();
+    if(scene == nullptr || scene->id != SCENE_ID_RACE) return;
+    EGG::Heap* mem1 = scene->structsHeaps.heaps[0];
+    EGG::Heap* mem2 = scene->structsHeaps.heaps[1];
+    OSReport("[VK 24P] memory %s: MEM1 %u KiB, MEM2 %u KiB free\n", step,
+        mem1 != nullptr ? mem1->getAllocatableSize(4) >> 10 : 0, mem2 != nullptr ? mem2->getAllocatableSize(4) >> 10 : 0);
+}
+#endif
+
 static void LoadRacerMiis() {
     extraMiisLoaded = 0;
     extraMiis = nullptr;
@@ -49,12 +61,22 @@ static void LoadRacerMiis() {
         return;
     }
     MiiGroup* group = new(heap, 4) MiiGroup;
-    group->Init(vanillaPlayers, playerMiisTextures, heap);
+    group->Init(vanillaPlayers, extraMiisTextures, heap);
     extraMiis = group;
     for(u8 id = vanillaPlayers; id < maxPlayers; ++id) {
         u8 aid, slot;
         bool isLocal;
-        if(!GetRacerConsole(id, aid, slot, isLocal)) continue;
+        if(!GetRacerConsole(id, aid, slot, isLocal)) {
+#ifdef P24TEST
+            const RKNet::Controller* controller = RKNet::Controller::sInstance;
+            aid = AidOfPlayer(id);
+            if(controller == nullptr || aid >= maxPlayers) continue;
+            slot = 0;
+            isLocal = aid == controller->subs[controller->currentSub & 1].localAid;
+#else
+            continue;
+#endif
+        }
         const u32 idx = id - vanillaPlayers;
         if(isLocal) reinterpret_cast<CopyMiiFunc>(Port(0x805faf34))(group, &mgr->sectionParams->localPlayerMiis, slot, idx);
         else reinterpret_cast<PlayerMiiFunc>(Port(0x805fa8b8))(group, idx, aid, slot);
@@ -63,10 +85,28 @@ static void LoadRacerMiis() {
     }
 }
 
+static bool raceSceneLoading = false;
+
 typedef void (*LoadSectionFunc)(SectionMgr* mgr);
 static void LoadRaceSection(SectionMgr* mgr) {
-    LoadRacerMiis();
+    raceSceneLoading = true;
     reinterpret_cast<LoadSectionFunc>(Port(0x80634fbc))(mgr);
+    raceSceneLoading = false;
+}
+
+typedef void (*InitSectionFunc)(void* section, u32 id);
+static void InitSection(void* section, u32 id) {
+    if(raceSceneLoading) {
+        ReportRaceMemory("before the Miis");
+        LoadRacerMiis();
+        ReportRaceMemory("after the Miis");
+    }
+    else if(extraMiis != nullptr && GameScene::GetCurrent() != nullptr && GameScene::GetCurrent()->id != SCENE_ID_RACE) {
+        extraMiis = nullptr;
+        extraMiisLoaded = 0;
+    }
+    reinterpret_cast<InitSectionFunc>(Port(0x80621e00))(section, id);
+    if(raceSceneLoading) ReportRaceMemory("after the race UI");
 }
 
 Mii* RacerMiiPast12(const MiiGroup* group, u8 idx) {
@@ -76,7 +116,7 @@ Mii* RacerMiiPast12(const MiiGroup* group, u8 idx) {
 
 static void* GetMiiTexObj(const MiiGroup* group, u32 idx, u32 texture) {
     if(idx >= group->miiCount) {
-        if(!HasRacerMii(idx) || group != PlayerMiis()) return nullptr;
+        if(!HasRacerMii(idx) || group != PlayerMiis() || extraMiis->texObj[texture] == nullptr) return nullptr;
         group = extraMiis;
         idx -= vanillaPlayers;
     }
@@ -107,6 +147,7 @@ static void StaffBadgePast12(HookRegs& regs, u32) {
 static const CallPatch calls[] ={
     { 0x805fa964, 0x54a0103a, reinterpret_cast<const void*>(GetMiiTexObj), true },
     { 0x80554694, 0x480e0929, reinterpret_cast<const void*>(LoadRaceSection), false },
+    { 0x80635064, 0x4bfecd9d, reinterpret_cast<const void*>(InitSection), false },
 };
 static const HookPatch hooks[] ={
     { 0x807f04ec, 0x800301b0, BalloonMiiCount, false },

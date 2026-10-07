@@ -3,6 +3,7 @@
 #include <MarioKartWii/Scene/GameScene.hpp>
 #include <Race/Players24/Players24.hpp>
 #include <Race/Players24/Patches.hpp>
+#include <Race/Players24/Online24.hpp>
 
 extern "C" void OSReport(const char* format, ...);
 
@@ -92,7 +93,9 @@ static void InitRaceEffects(void* mgr) {
             previous = reinterpret_cast<BecomeCurrentFunc>(Port(0x80229d74))(mem2);
         }
     }
+    ReportRaceMemory("before the effects");
     reinterpret_cast<InitRaceEffectsFunc>(Port(0x8067ca4c))(mgr);
+    ReportRaceMemory("after the effects");
     if(previous != nullptr) reinterpret_cast<BecomeCurrentFunc>(Port(0x80229d74))(previous);
 }
 

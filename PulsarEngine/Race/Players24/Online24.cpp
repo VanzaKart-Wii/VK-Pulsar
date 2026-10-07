@@ -86,6 +86,9 @@ bool IsConsoles24() { return cpusPerConsole == 0 && IsOnline24(); }
 
 bool HasNoMiiSlot(u8 id) {
     if(!IsOnline24() || id >= maxPlayers) return false;
+#ifdef P24TEST
+    if(id >= vanillaPlayers && HasRacerMii(id)) return false;
+#endif
     if(IsOnlineCPU(id)) return true;
     return id >= vanillaPlayers && !HasRacerMii(id);
 }

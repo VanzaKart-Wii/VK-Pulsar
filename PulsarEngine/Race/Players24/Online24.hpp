@@ -16,6 +16,11 @@ bool ShowsCharacter(u8 id);
 bool KeepsCharacterHead(u8 id);
 bool HasRacerMii(u8 id);
 Mii* RacerMiiPast12(const MiiGroup* group, u8 idx);
+#ifdef P24TEST
+void ReportRaceMemory(const char* step);
+#else
+inline void ReportRaceMemory(const char*) {}
+#endif
 bool GetRacerName(u8 id, wchar_t* dst, u32 length);
 bool GetRacerConsole(u8 id, u8& aid, u8& playerIndexOnConsole, bool& isLocal);
 bool CanHostRoom24();
