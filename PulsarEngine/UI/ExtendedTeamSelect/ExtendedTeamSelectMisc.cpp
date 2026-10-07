@@ -13,7 +13,7 @@
 #include <MarioKartWii/UI/Ctrl/CtrlRace/CtrlRaceBalloon.hpp>
 #include <MarioKartWii/UI/Ctrl/CtrlRace/CtrlRaceRankNum.hpp>
 #include <MarioKartWii/Race/RaceInfo/RaceInfo.hpp>
-#include <Network/Rating/RankManager.hpp>
+#include <Network/Rating/StaffBadge.hpp>
 #include <Race/Players24/Online24.hpp>
 
 
@@ -232,51 +232,39 @@ void CtrlRaceNameBalloon_PlayAnimationAtFrameAndDisable(AnimationGroup* _this, u
 }
 
 /*
-    Rank and staff badges on the name above each kart.
+    The name above a kart in character style (UpdateInfo's two SetTextBoxMessage with the character's name, the
+    call sites Retro Rewind hooks for its custom character names). A player's balloon shows its Mii and name, and
+    the staff badge on their right in handle_text (OnlineParams::rankBMG, RatingUI.cpp): nothing to add to the name.
 
-    UpdateInfo writes the name with two SetTextBoxMessage calls, and those are replaced
-    here (the same two call sites Retro Rewind hooks for its custom character names), so
-    the badge goes in whenever the game sets the name: at load and on every refresh.
-    Hooking only CtrlRaceNameBalloon_refresh missed a balloon that shows the same player
-    from the start, which in a 2-player room is every one of them.
-
-    Only a message that carries a Mii gets a badge (the balloon does not necessarily use
-    0x251d for it); a character name ("Mario") has none and is left alone. The name is
-    rebuilt from the Mii as one BMG_TEXT string, see Rank::ComposeRaceName. The control
-    keeps the displayed player at 0x178, nameSlotId.
+    Online past 12 racers a player without a Mii (Race/Players24/Online24.cpp, ShowsCharacter: its Mii could not be
+    loaded) has the balloon in character style, which also empties handle_text: the player's name goes in instead of
+    the character's, with the staff badge after it. The control keeps the displayed player at 0x178, nameSlotId.
 */
-static wchar_t sBalloonNames[24][64]; //24 racers in the online 24 players rooms
+static wchar_t sBalloonNames[24][16]; //24 racers in the online 24 players rooms
 
 void CtrlRaceNameBalloon_SetName(CtrlRaceNameBalloon* _this, const char* paneName, u32 bmgId, const Text::Info* info) {
     const u32 playerId = _this->nameSlotId;
-    /*
-        Online past 12 racers every balloon is in character style (Race/Players24/Online24.cpp, ShowsCharacter),
-        which writes the character's name: the player's goes in instead, with its badge where the Mii has a slot.
-    */
     if (playerId < 24 && Pulsar::Players24::ShowsCharacter((u8)playerId)) {
-        wchar_t name[16];
-        if (Pulsar::Players24::GetRacerName((u8)playerId, name, 16)) {
-            //The badge from the player's console: the game's tables stop at id 11
+        wchar_t* name = sBalloonNames[playerId];
+        if (Pulsar::Players24::GetRacerName((u8)playerId, name, 13)) {
             u8 aid, slot;
             bool isLocal;
-            if (!Pulsar::Players24::GetRacerConsole((u8)playerId, aid, slot, isLocal) ||
-                !PointRating::Rank::ComposeConsoleName(aid, slot, isLocal, name, sBalloonNames[playerId], 64)) {
-                u32 i = 0;
-                for (; i < 63 && name[i] != 0; ++i) sBalloonNames[playerId][i] = name[i];
-                sBalloonNames[playerId][i] = 0;
+            if (Pulsar::Players24::GetRacerConsole((u8)playerId, aid, slot, isLocal)) {
+                const wchar_t glyph = PointRating::Staff::GetBadgeGlyph(isLocal ? PointRating::Staff::GetLocal(slot)
+                    : PointRating::Staff::GetRemote(aid, slot));
+                if (glyph != 0) {
+                    u32 i = 0;
+                    while (name[i] != 0) ++i;
+                    name[i] = L' ';
+                    name[i + 1] = glyph;
+                    name[i + 2] = 0;
+                }
             }
             Text::Info nameInfo;
-            nameInfo.strings[0] = sBalloonNames[playerId];
+            nameInfo.strings[0] = name;
             _this->SetTextBoxMessage(paneName, BMG_TEXT, &nameInfo);
             return;
         }
-    }
-    if (info != nullptr && info->miis[0] != nullptr && playerId < 12 &&
-        PointRating::Rank::ComposeRaceName((u8)playerId, sBalloonNames[playerId], 64)) {
-        Text::Info rankedInfo;
-        rankedInfo.strings[0] = sBalloonNames[playerId];
-        _this->SetTextBoxMessage(paneName, BMG_TEXT, &rankedInfo);
-        return;
     }
     _this->SetTextBoxMessage(paneName, bmgId, info);
 }

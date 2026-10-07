@@ -86,12 +86,15 @@ bool IsConsoles24() { return cpusPerConsole == 0 && IsOnline24(); }
 
 bool HasNoMiiSlot(u8 id) {
     if(!IsOnline24() || id >= maxPlayers) return false;
-    return id >= vanillaPlayers || IsOnlineCPU(id);
+    if(IsOnlineCPU(id)) return true;
+    return id >= vanillaPlayers && !HasRacerMii(id);
 }
 
-bool ShowsCharacter(u8 id) {
-    if(HasNoMiiSlot(id)) return true;
-    return IsOnline24() && HasExtraRacers();
+bool ShowsCharacter(u8 id) { return HasNoMiiSlot(id); }
+
+bool KeepsCharacterHead(u8 id) {
+    if(!IsOnline24() || id >= maxPlayers) return false;
+    return id >= vanillaPlayers || IsOnlineCPU(id) || HasExtraRacers();
 }
 
 static const wchar_t defaultMiiName[] = L"Player";
@@ -327,6 +330,7 @@ typedef void (*MenuDataSetupFunc)(void* r3, void* r4, void* r5, void* r6);
 static void* menuDataSetupOriginal = nullptr;
 static void MenuDataSetup(void* r3, void* r4, void* r5, void* r6) {
     reinterpret_cast<MenuDataSetupFunc>(menuDataSetupOriginal)(r3, r4, r5, r6);
+    LoadRacerMiis();
     if(!IsOnline24()) return;
     CacheRacerNames();
     const RKNet::Controller* controller = RKNet::Controller::sInstance;

@@ -149,7 +149,7 @@ static void MiiOfAid(HookRegs& regs, u32) {
 }
 
 static Mii* GetMiiChecked(const MiiGroup* group, u8 idx) {
-    if(idx >= group->miiCount) return nullptr;
+    if(idx >= group->miiCount) return RacerMiiPast12(group, idx);
     return group->mii[idx];
 }
 

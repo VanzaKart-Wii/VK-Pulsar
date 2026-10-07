@@ -3,6 +3,9 @@
 #include <kamek.hpp>
 #include <MarioKartWii/RKNet/SELECT.hpp>
 
+class Mii;
+class MiiGroup;
+
 namespace Pulsar {
 namespace Players24 {
 
@@ -10,6 +13,10 @@ bool IsOnline24();
 bool IsConsoles24();
 bool HasNoMiiSlot(u8 id);
 bool ShowsCharacter(u8 id);
+bool KeepsCharacterHead(u8 id);
+bool HasRacerMii(u8 id);
+void LoadRacerMiis();
+Mii* RacerMiiPast12(const MiiGroup* group, u8 idx);
 bool GetRacerName(u8 id, wchar_t* dst, u32 length);
 bool GetRacerConsole(u8 id, u8& aid, u8& playerIndexOnConsole, bool& isLocal);
 bool CanHostRoom24();

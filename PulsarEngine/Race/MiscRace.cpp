@@ -50,9 +50,9 @@ static int MiiHeads(Racedata* racedata, u32 unused, u32 unused2, u8 id) {
     CharacterId charId = player.characterId;
     PlayerType type = player.playerType;
     if (Pulsar::System::sInstance->IsContext(Pulsar::PULSAR_MIIHEADS)) {
-        // Online 24: the CPUs of the other consoles are REAL_ONLINE but have no Mii (ids 12+ are past the
-        // 12 slots of playerMiis, a garbage texture: Dolphin's "Unknown Pointer" at the first race of a room)
-        if ((type == PLAYER_REAL_LOCAL || type == PLAYER_REAL_ONLINE || type == PLAYER_GHOST) && !Players24::ShowsCharacter(id)) {
+        // Online 24: the CPUs of the other consoles are REAL_ONLINE but have no Mii, and past 12 racers every driver
+        // keeps its character (a Mii driver with id 12+ read past playerMiis' 12 slots: Dolphin's "Unknown Pointer")
+        if ((type == PLAYER_REAL_LOCAL || type == PLAYER_REAL_ONLINE || type == PLAYER_GHOST) && !Players24::KeepsCharacterHead(id)) {
             if (charId < MII_M) {
                 charId = MII_M;
             }

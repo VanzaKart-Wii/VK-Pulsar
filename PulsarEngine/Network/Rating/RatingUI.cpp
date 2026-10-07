@@ -50,6 +50,21 @@ static u8 GetNameRatingIcon(u8 wheelType, u8 starRating) {
 }
 kmBranch(0x805e3d38, GetNameRatingIcon);
 
+/*
+    Replaces OnlineParams::SetRankBMG. In a race, the name above the kart, the leaderboard and the results draw
+    rankBMG in their handle_text pane, on the right of the Mii's name. Only a staff badge goes there: a console
+    sends STAFF_ICON_BASE + role for a staff member and its prestige rank otherwise (RatingHooks), and a rank is
+    left out of the race. Check Members and the WFC page still show it in the name.
+
+    The vanilla bound was 12, the wheel-and-star icons; the staff indices go up to RANK_ICON_INDEX_CAP.
+*/
+static void SetRankBMG(OnlineParams* params, u8 playerId, u8 index) {
+    if (playerId >= 12) return;
+    const bool isStaff = index > Config::STAFF_ICON_BASE && index < Config::RANK_ICON_INDEX_CAP;
+    params->rankBMG[playerId] = isStaff ? Config::RANK_BMG_BASE + index : 0;
+}
+kmBranch(0x805e3d48, SetRankBMG);
+
 static float GetRatingForDisplay(Pages::SELECTStageMgr* mgr, u32 playerId, bool isLocal, bool isBR, bool* hasDecimal) {
     *hasDecimal = false;
     if (isLocal) {

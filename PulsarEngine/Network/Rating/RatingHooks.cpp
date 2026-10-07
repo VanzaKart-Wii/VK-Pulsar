@@ -96,10 +96,7 @@ static void ApplyRankIcon() {
     kmRuntimeWrite32A(0x806436fc, instruction);
 }
 static SectionLoadHook rankIconHook(ApplyRankIcon);
-
-// SetRankBMG's first instruction is the bound it checks the index against, 12 in vanilla
-// (li r6, 12). Raised so the staff indices past it are not turned into "no icon".
-kmWrite32(0x805e3d48, 0x38C00000 | Config::RANK_ICON_INDEX_CAP);  // li r6, cap
+// On reception the index goes through SetRankBMG, replaced in RatingUI.cpp: only a staff badge is drawn in a race.
 #endif
 
 // --------------------------------------------------------------- licence mirror

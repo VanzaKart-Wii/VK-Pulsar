@@ -46,9 +46,8 @@ void fillLeaderboardResults(int count, CtrlRaceResult** results) {
             if (displayLeaderboardType == LEADERBOARD_DISPLAY_TIMES) {
                 results[i]->FillFinishTime(playerId);
             } else if (displayLeaderboardType == LEADERBOARD_DISPLAY_NAMES) {
-                // No badge in the name here: this row already draws the rank icon
-                // (OnlineParams::rankBMG), which carries the staff badge in place of the
-                // rank, and a prefixed name showed the same badge twice.
+                // No badge in the name here: the row draws the staff badge on its right, in
+                // handle_text (OnlineParams::rankBMG, see SetRankBMG in RatingUI.cpp).
                 results[i]->FillName(playerId);
             } else if (displayLeaderboardType == LEADERBOARD_DISPLAY_FC) {
                 if (playerId < 12) {

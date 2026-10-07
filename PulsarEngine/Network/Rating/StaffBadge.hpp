@@ -7,8 +7,9 @@
     Badges reserved to the people who worked on VanzaKart.
 
     They are not ranks: they are not earned, never replace the prestige rank and do not
-    count towards it. A contributor who is also ranked shows both, staff badge first:
-    "<staff><rank> Name". Below rank 1 there is no rank badge, so only the staff one shows.
+    count towards it. In the menus a contributor who is also ranked shows both, staff badge
+    first: "<staff><rank> Name". In a race only the staff badge shows, on the right of the
+    name (RatingUI.cpp, SetRankBMG).
 
     Nothing is transmitted. Every console resolves the badge itself by matching the
     player's profile ID (the low 32 bits of the friend code, authenticated by the WFC
@@ -46,6 +47,10 @@ Role GetForPlayer(u8 playerId);
 
 // Glyph for a role, or 0 when the role draws nothing.
 wchar_t GetBadgeGlyph(Role role);
+
+// The message that draws a role's badge in a race (OnlineParams::rankBMG, the handle_text panes on the right of
+// the name), or 0 when the role draws nothing.
+u32 GetIconBMG(Role role);
 
 }  // namespace Staff
 }  // namespace PointRating

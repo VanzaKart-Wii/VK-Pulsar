@@ -116,6 +116,11 @@ wchar_t GetBadgeGlyph(Role role) {
     return (wchar_t)(Config::STAFF_GLYPH_BASE + role);
 }
 
+u32 GetIconBMG(Role role) {
+    if (role == ROLE_NONE || role >= ROLE_COUNT) return 0;
+    return Config::RANK_BMG_BASE + Config::STAFF_ICON_BASE + role;
+}
+
 }  // namespace Staff
 }  // namespace PointRating
 }  // namespace Pulsar

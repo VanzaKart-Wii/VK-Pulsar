@@ -4,9 +4,6 @@
 #include <MarioKartWii/Race/RaceData.hpp>
 #include <MarioKartWii/RKSYS/RKSYSMgr.hpp>
 #include <MarioKartWii/RKNet/RKNetController.hpp>
-#include <MarioKartWii/UI/Section/SectionMgr.hpp>
-#include <MarioKartWii/Mii/MiiGroup.hpp>
-#include <Network/Rating/StaffBadge.hpp>
 
 namespace Pulsar {
 namespace PointRating {
@@ -137,42 +134,6 @@ bool PrefixWithBadge(RankId rank, const wchar_t* name, wchar_t* dst, u32 dstLen,
     }
     dst[i + prefixLen] = L'\0';
     return true;
-}
-
-/*
-    The name comes from the Mii, not from the pane: the pane holds the message FillName or
-    UpdateInfo set, which is an escape sequence asking for "the Mii name", not the name.
-    Copied into a BMG_TEXT string, that escape resolves without its Mii and comes out as
-    some default Mii's name.
-*/
-bool ComposeRaceName(u8 playerId, wchar_t* dst, u32 dstLen) {
-    if (playerId >= 12) return false;
-    const SectionMgr* sectionMgr = SectionMgr::sInstance;
-    if (sectionMgr == nullptr || sectionMgr->sectionParams == nullptr) return false;
-    const Mii* mii = sectionMgr->sectionParams->playerMiis.GetMii(playerId);
-    if (mii == nullptr) return false;
-
-    const wchar_t staff = Staff::GetBadgeGlyph(Staff::GetForPlayer(playerId));
-    return PrefixWithBadge(GetForPlayer(playerId), mii->info.name, dst, dstLen, staff);
-}
-
-bool ComposeConsoleName(u8 aid, u8 playerIndexOnConsole, bool isLocal, const wchar_t* name, wchar_t* dst, u32 dstLen) {
-    if (name == nullptr) return false;
-    RankId rank = 0;
-    Staff::Role role = Staff::ROLE_NONE;
-    if (isLocal) {
-        // Both local players share the licence, as in GetForPlayer
-        RKSYS::Mgr* rksys = RKSYS::Mgr::sInstance;
-        if (rksys != nullptr && rksys->curLicenseId >= 0 && rksys->curLicenseId < (int)Config::MAX_LICENSES) {
-            rank = GetLocal(rksys->curLicenseId);
-        }
-        role = Staff::GetLocal(playerIndexOnConsole);
-    }
-    else {
-        rank = GetRemote(aid, playerIndexOnConsole);
-        role = Staff::GetRemote(aid, playerIndexOnConsole);
-    }
-    return PrefixWithBadge(rank, name, dst, dstLen, Staff::GetBadgeGlyph(role));
 }
 
 }  // namespace Rank
