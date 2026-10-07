@@ -156,6 +156,25 @@ bool ComposeRaceName(u8 playerId, wchar_t* dst, u32 dstLen) {
     return PrefixWithBadge(GetForPlayer(playerId), mii->info.name, dst, dstLen, staff);
 }
 
+bool ComposeConsoleName(u8 aid, u8 playerIndexOnConsole, bool isLocal, const wchar_t* name, wchar_t* dst, u32 dstLen) {
+    if (name == nullptr) return false;
+    RankId rank = 0;
+    Staff::Role role = Staff::ROLE_NONE;
+    if (isLocal) {
+        // Both local players share the licence, as in GetForPlayer
+        RKSYS::Mgr* rksys = RKSYS::Mgr::sInstance;
+        if (rksys != nullptr && rksys->curLicenseId >= 0 && rksys->curLicenseId < (int)Config::MAX_LICENSES) {
+            rank = GetLocal(rksys->curLicenseId);
+        }
+        role = Staff::GetLocal(playerIndexOnConsole);
+    }
+    else {
+        rank = GetRemote(aid, playerIndexOnConsole);
+        role = Staff::GetRemote(aid, playerIndexOnConsole);
+    }
+    return PrefixWithBadge(rank, name, dst, dstLen, Staff::GetBadgeGlyph(role));
+}
+
 }  // namespace Rank
 }  // namespace PointRating
 }  // namespace Pulsar

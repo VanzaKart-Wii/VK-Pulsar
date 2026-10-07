@@ -132,6 +132,17 @@ static void CacheRacerNames() {
     }
 }
 
+bool GetRacerConsole(u8 id, u8& aid, u8& playerIndexOnConsole, bool& isLocal) {
+    if(id >= maxPlayers || !IsOnline24() || IsOnlineCPU(id)) return false;
+    const RKNet::Controller* controller = RKNet::Controller::sInstance;
+    aid = AidOfPlayer(id);
+    if(controller == nullptr || aid >= maxPlayers) return false;
+    playerIndexOnConsole = 0;
+    for(u8 other = 0; other < id; ++other) if(AidOfPlayer(other) == aid) ++playerIndexOnConsole;
+    isLocal = aid == CurrentSub(*controller).localAid;
+    return true;
+}
+
 bool GetRacerName(u8 id, wchar_t* dst, u32 length) {
     if(dst == nullptr || length == 0 || id >= maxPlayers || !IsOnline24() || IsOnlineCPU(id)) return false;
     if(racerNames[id][0] == 0) return ReadRacerName(id, dst, length);

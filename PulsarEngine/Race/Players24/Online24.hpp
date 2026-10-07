@@ -11,6 +11,7 @@ bool IsConsoles24();
 bool HasNoMiiSlot(u8 id);
 bool ShowsCharacter(u8 id);
 bool GetRacerName(u8 id, wchar_t* dst, u32 length);
+bool GetRacerConsole(u8 id, u8& aid, u8& playerIndexOnConsole, bool& isLocal);
 bool CanHostRoom24();
 bool IsHostingRoom24();
 bool HostPlayers24Bit();

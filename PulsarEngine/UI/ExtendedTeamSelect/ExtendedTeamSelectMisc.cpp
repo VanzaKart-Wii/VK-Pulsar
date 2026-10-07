@@ -254,8 +254,17 @@ void CtrlRaceNameBalloon_SetName(CtrlRaceNameBalloon* _this, const char* paneNam
         which writes the character's name: the player's goes in instead, with its badge where the Mii has a slot.
     */
     if (playerId < 24 && Pulsar::Players24::ShowsCharacter((u8)playerId)) {
-        if ((playerId < 12 && PointRating::Rank::ComposeRaceName((u8)playerId, sBalloonNames[playerId], 64)) ||
-            Pulsar::Players24::GetRacerName((u8)playerId, sBalloonNames[playerId], 64)) {
+        wchar_t name[16];
+        if (Pulsar::Players24::GetRacerName((u8)playerId, name, 16)) {
+            //The badge from the player's console: the game's tables stop at id 11
+            u8 aid, slot;
+            bool isLocal;
+            if (!Pulsar::Players24::GetRacerConsole((u8)playerId, aid, slot, isLocal) ||
+                !PointRating::Rank::ComposeConsoleName(aid, slot, isLocal, name, sBalloonNames[playerId], 64)) {
+                u32 i = 0;
+                for (; i < 63 && name[i] != 0; ++i) sBalloonNames[playerId][i] = name[i];
+                sBalloonNames[playerId][i] = 0;
+            }
             Text::Info nameInfo;
             nameInfo.strings[0] = sBalloonNames[playerId];
             _this->SetTextBoxMessage(paneName, BMG_TEXT, &nameInfo);
