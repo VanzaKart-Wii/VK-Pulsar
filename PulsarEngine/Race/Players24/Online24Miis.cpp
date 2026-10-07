@@ -47,13 +47,26 @@ void ReportRaceMemory(const char* step) {
 }
 #endif
 
+static u32 reportedNoTexture = 0;
 static void LoadRacerMiis() {
     extraMiisLoaded = 0;
+    reportedNoTexture = 0;
     extraMiis = nullptr;
-    if(!MiisSetReady() || !IsOnline24() || AidOfPlayer(vanillaPlayers) == 0xFF) return;
+    if(!IsOnline24()) return;
+    if(AidOfPlayer(vanillaPlayers) == 0xFF) {
+        if(RoomPlayerCount() > vanillaPlayers) OSReport("[VK 24P] Miis 13-24: none (no id 12, %d in the room)\n", RoomPlayerCount());
+        return;
+    }
+    if(!MiisSetReady()) {
+        OSReport("[VK 24P] Miis 13-24: none (patches not in)\n");
+        return;
+    }
     const GameScene* scene = GameScene::GetCurrent();
     const SectionMgr* mgr = SectionMgr::sInstance;
-    if(scene == nullptr || scene->id != SCENE_ID_RACE || mgr == nullptr || mgr->sectionParams == nullptr) return;
+    if(scene == nullptr || scene->id != SCENE_ID_RACE || mgr == nullptr || mgr->sectionParams == nullptr) {
+        OSReport("[VK 24P] Miis 13-24: none (scene %d)\n", scene != nullptr ? scene->id : -1);
+        return;
+    }
     EGG::Heap* heap = scene->structsHeaps.heaps[1];
     const u32 free = heap != nullptr ? heap->getAllocatableSize(4) : 0;
     if(free < extraMiisSize + extraMiisMargin) {
@@ -67,6 +80,7 @@ static void LoadRacerMiis() {
         u8 aid, slot;
         bool isLocal;
         if(!GetRacerConsole(id, aid, slot, isLocal)) {
+            if(AidOfPlayer(id) < maxPlayers) OSReport("[VK 24P] Mii of racer %d: no console (aid %d)\n", id, AidOfPlayer(id));
 #ifdef P24TEST
             const RKNet::Controller* controller = RKNet::Controller::sInstance;
             aid = AidOfPlayer(id);
@@ -81,8 +95,12 @@ static void LoadRacerMiis() {
         if(isLocal) reinterpret_cast<CopyMiiFunc>(Port(0x805faf34))(group, &mgr->sectionParams->localPlayerMiis, slot, idx);
         else reinterpret_cast<PlayerMiiFunc>(Port(0x805fa8b8))(group, idx, aid, slot);
         if(group->mii[idx] != nullptr) extraMiisLoaded |= 1 << idx;
-        else OSReport("[VK 24P] Mii of racer %d (aid %d, slot %d) not loaded\n", id, aid, slot);
+        else OSReport("[VK 24P] Mii of racer %d (aid %d, slot %d%s) not loaded\n", id, aid, slot, isLocal ? ", ours" : "");
     }
+    typedef void (*DrawQueuedFunc)(void* maker);
+    void* maker = *reinterpret_cast<void**>(Port(0x809c2df0));
+    if(maker != nullptr && extraMiisLoaded != 0) reinterpret_cast<DrawQueuedFunc>(Port(0x80782528))(maker);
+    OSReport("[VK 24P] Miis 13-24: loaded %03x, %u KiB free in MEM2\n", extraMiisLoaded, heap->getAllocatableSize(4) >> 10);
 }
 
 static bool raceSceneLoading = false;
@@ -116,7 +134,14 @@ Mii* RacerMiiPast12(const MiiGroup* group, u8 idx) {
 
 static void* GetMiiTexObj(const MiiGroup* group, u32 idx, u32 texture) {
     if(idx >= group->miiCount) {
-        if(!HasRacerMii(idx) || group != PlayerMiis() || extraMiis->texObj[texture] == nullptr) return nullptr;
+        if(!HasRacerMii(idx) || group != PlayerMiis() || extraMiis->texObj[texture] == nullptr) {
+            if(group == PlayerMiis() && idx < maxPlayers && (reportedNoTexture >> (idx - vanillaPlayers) & 1) == 0) {
+                reportedNoTexture |= 1 << (idx - vanillaPlayers);
+                OSReport("[VK 24P] Mii texture %d of racer %d asked: %s\n", texture, idx,
+                    HasRacerMii(idx) ? "not in the group" : "no Mii");
+            }
+            return nullptr;
+        }
         group = extraMiis;
         idx -= vanillaPlayers;
     }
