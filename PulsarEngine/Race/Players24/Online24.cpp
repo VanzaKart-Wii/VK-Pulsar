@@ -130,17 +130,6 @@ static void CacheRacerNames() {
     for(u8 id = 0; id < maxPlayers; ++id) {
         if(!ReadRacerName(id, racerNames[id], 11)) racerNames[id][0] = 0;
     }
-    char line[24 * 12 + 1];
-    u32 length = 0;
-    for(u8 id = 0; id < maxPlayers; ++id) {
-        for(u32 i = 0; i < 10 && racerNames[id][i] != 0; ++i) {
-            const wchar_t c = racerNames[id][i];
-            line[length++] = c >= 0x20 && c < 0x7f ? static_cast<char>(c) : '?';
-        }
-        line[length++] = id + 1 < maxPlayers ? '|' : 0;
-    }
-    line[length] = 0;
-    OSReport("[VK 24P] racer names: %s\n", line);
 }
 
 bool GetRacerName(u8 id, wchar_t* dst, u32 length) {
@@ -322,7 +311,6 @@ static u32 SelectGet(u32 palAddress, u8 aid, u8 slot) {
     return reinterpret_cast<SelectGetFunc>(Port(palAddress))(RKNet::SELECTHandler::sInstance, aid, slot);
 }
 
-static void LogTable();
 typedef void (*CopyMiiFunc)(MiiGroup* group, u32 srcIdx, u32 destIdx);
 typedef void (*MenuDataSetupFunc)(void* r3, void* r4, void* r5, void* r6);
 static void* menuDataSetupOriginal = nullptr;
@@ -332,7 +320,6 @@ static void MenuDataSetup(void* r3, void* r4, void* r5, void* r6) {
     CacheRacerNames();
     const RKNet::Controller* controller = RKNet::Controller::sInstance;
     if(controller == nullptr || RKNet::SELECTHandler::sInstance == nullptr) return;
-    LogTable();
     const u8 localAid = CurrentSub(*controller).localAid;
     const u8* table = AidTable(*controller);
     RacedataScenario& menu = Racedata::sInstance->menusScenario;
@@ -419,11 +406,6 @@ static void LocalCountWithCPU(HookRegs& regs, u32 original) {
     u32 count = LoadByte(regs, original);
     if(InRace24() && GetOwnCPUId() != noPlayer) ++count;
     regs.gpr[RegD(original)] = count;
-}
-static u32 lastRACEDATACount = 0;
-static void RACEDATACountWithCPU(HookRegs& regs, u32 original) {
-    LocalCountWithCPU(regs, original);
-    lastRACEDATACount = regs.gpr[RegD(original)];
 }
 
 typedef void (*SetTextBoxMessageFunc)(void* control, const char* pane, u32 bmgId, const void* info);
@@ -513,50 +495,6 @@ static void RemoteCountWithCPU(HookRegs& regs, u32 original) {
     regs.gpr[RegD(original)] = count;
 }
 
-typedef bool (*PlayerQueryFunc)(const RKNet::PacketMgr* mgr, u32 playerId);
-typedef const void* (*RacedataFunc)(const RKNet::PacketMgr* mgr, u32 playerId);
-static void LogRacers() {
-    static u32 frame = 0;
-    const RKNet::PacketMgr* mgr = RKNet::PacketMgr::sInstance;
-    const RKNet::Controller* controller = RKNet::Controller::sInstance;
-    if(mgr == nullptr || controller == nullptr || !IsOnline24()) return;
-    if(frame++ % 180 != 0) return;
-    const RKNet::ControllerSub& sub = CurrentSub(*controller);
-    OSReport("[VK 24P] online: humans %d, own CPU %d, local aid %d, local count %d, racers %d, RACEDATA sent for %d\n",
-        humanCount, GetOwnCPUId(), sub.localAid, sub.localPlayerCount, GetRacePlayerCount(), lastRACEDATACount);
-    const RacedataScenario& race = Racedata::sInstance->racesScenario;
-    const Raceinfo* raceinfo = Raceinfo::sInstance;
-    if(raceinfo != nullptr) OSReport("[VK 24P]   race stage %d, frames %d\n", raceinfo->stage, raceinfo->raceFrames);
-    for(u8 id = 0; id < GetRacePlayerCount(); ++id) {
-        const RacedataPlayer& player = GetPlayer(race, id);
-        const bool isLocal = reinterpret_cast<PlayerQueryFunc>(Port(0x806548a8))(mgr, id);
-        const bool isConnected = reinterpret_cast<PlayerQueryFunc>(Port(0x80654820))(mgr, id);
-        const u32* words = 0;
-        if(!isLocal) words = static_cast<const u32*>(reinterpret_cast<RacedataFunc>(Port(0x80653abc))(mgr, id));
-        const RaceinfoPlayer* info = nullptr;
-        if(raceinfo != nullptr && raceinfo->players != nullptr) info = raceinfo->players[id];
-        OSReport("[VK 24P]   id %2d type %d aid %d char %2d local %d connected %d pos %2d state %02x RACEDATA %08x %08x %08x\n",
-            id, player.playerType, AidOfPlayer(id), player.characterId, isLocal, isConnected,
-            info != nullptr ? info->position : 0, info != nullptr ? info->stateFlags : 0,
-            words ? words[0] : 0, words ? words[1] : 0, words ? words[4] : 0);
-    }
-    LogRaceSync();
-}
-static RaceFrameHook logRacers(LogRacers);
-
-static void LogTable() {
-    const RKNet::Controller* controller = RKNet::Controller::sInstance;
-    if(controller == nullptr) return;
-    const u8* table = AidTable(*controller);
-#ifdef P24TEST
-    OSReport("[VK 24P] TEST BUILD: %d CPUs per console\n", cpusPerConsole);
-#endif
-    OSReport("[VK 24P] MenuDataSetup: humans %d, table %d %d %d %d %d %d %d %d %d %d %d %d | %d %d %d %d %d %d %d %d %d %d %d %d\n",
-        humanCount, table[0], table[1], table[2], table[3], table[4], table[5], table[6], table[7], table[8], table[9],
-        table[10], table[11], table[12], table[13], table[14], table[15], table[16], table[17], table[18], table[19],
-        table[20], table[21], table[22], table[23]);
-}
-
 #ifdef P24TEST
 static u8 SlotOf(u8 id) {
     const u8 aid = AidOfPlayer(id);
@@ -627,7 +565,7 @@ static const HookPatch hooks[] ={
     { 0x80654ddc, 0x7fe903a6, DoubledLoop, false },
     { 0x80655208, 0x7fa903a6, DoubledLoop, false },
     { 0x8065509c, 0x88040058, LocalCountWithCPU, false },
-    { 0x80655108, 0x88030058, RACEDATACountWithCPU, false },
+    { 0x80655108, 0x88030058, LocalCountWithCPU, false },
     { 0x8065c66c, 0x88040058, LocalCountWithCPU, false },
     { 0x8065dce8, 0x88030058, LocalCountWithCPU, false },
     { 0x8065f6bc, 0x88040058, LocalCountWithCPU, false },

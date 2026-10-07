@@ -153,8 +153,6 @@ static void NewControllerTimes(HookRegs& regs, u32) {
     RKNet::Controller* controller = reinterpret_cast<RKNet::Controller*>(regs.gpr[27]);
     ClearTimes(controller, firstNewAid);
     memset(&controller->selectTime350DivTime3B0[0], 0, sizeof(controller->selectTime350DivTime3B0));
-    OSReport("[VK 24P] network heap after the buffers of 24 aids: %d KiB free\n",
-        controller->Heap->getAllocatableSize(4) >> 10);
     for(u32 aid = 0; aid < aidCount; ++aid) {
         bool ok = controller->fullSendPackets[aid] != nullptr && controller->fullSendPackets[aid]->packet != nullptr;
         for(u32 row = 0; row < 2; ++row) {

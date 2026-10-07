@@ -62,8 +62,6 @@ static EGG::Heap* CreateRaceSceneHeap(GameScene* scene, u32 size, u32 parentHeap
             const u32 room = (room1 > room2 ? room1 : room2) & ~0x1F;
             size = room > size ? size : room < 0x80000 ? 0x80000 : room;
         }
-        OSReport("[VK 24P] race scene heap: %d KiB in MEM%d (largest free: MEM1 %d KiB, MEM2 %d KiB)\n", size >> 10,
-            parentHeapIdx + 1, free1 >> 10, free2 >> 10);
     }
     return reinterpret_cast<CreateHeapFunc>(Port(0x8051b8e4))(scene, size, parentHeapIdx);
 }
@@ -78,8 +76,6 @@ static void RaceUIHeap(HookRegs& regs, u32) {
         const u32 free1 = mem1 != nullptr ? mem1->getAllocatableSize(-8) : 0;
         const u32 free2 = mem2 != nullptr ? mem2->getAllocatableSize(-8) : 0;
         if(free2 < raceUIRoom && free1 >= raceUIRoom + mem1Spare) heapIdx = 0;
-        OSReport("[VK 24P] race UI in MEM%d (largest free: MEM1 %d KiB, MEM2 %d KiB)\n", heapIdx + 1, free1 >> 10,
-            free2 >> 10);
     }
     regs.gpr[4] = reinterpret_cast<u32>(scene->structsHeaps.heaps[heapIdx]);
 }
@@ -89,19 +85,15 @@ typedef void (*InitRaceEffectsFunc)(void* mgr);
 typedef EGG::Heap* (*BecomeCurrentFunc)(const EGG::Heap* heap);
 static void InitRaceEffects(void* mgr) {
     EGG::Heap* previous = nullptr;
-    EGG::Heap* mem2 = nullptr;
-    u32 free2 = 0;
     const GameScene* scene = GameScene::GetCurrent();
     if(IsReady() && HasExtraRacers() && scene != nullptr && scene->id == SCENE_ID_RACE) {
-        mem2 = scene->structsHeaps.heaps[1];
-        free2 = mem2 != nullptr ? mem2->getAllocatableSize(-8) : 0;
-        if(free2 >= raceEffectsRoom) previous = reinterpret_cast<BecomeCurrentFunc>(Port(0x80229d74))(mem2);
+        EGG::Heap* mem2 = scene->structsHeaps.heaps[1];
+        if(mem2 != nullptr && mem2->getAllocatableSize(-8) >= raceEffectsRoom) {
+            previous = reinterpret_cast<BecomeCurrentFunc>(Port(0x80229d74))(mem2);
+        }
     }
     reinterpret_cast<InitRaceEffectsFunc>(Port(0x8067ca4c))(mgr);
-    if(previous != nullptr) {
-        reinterpret_cast<BecomeCurrentFunc>(Port(0x80229d74))(previous);
-        OSReport("[VK 24P] race effects in MEM2: %d KiB\n", (free2 - mem2->getAllocatableSize(-8)) >> 10);
-    }
+    if(previous != nullptr) reinterpret_cast<BecomeCurrentFunc>(Port(0x80229d74))(previous);
 }
 
 static void BeginRaceGraphics(HookRegs&, u32) {
