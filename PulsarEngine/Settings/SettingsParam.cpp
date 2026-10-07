@@ -2,41 +2,56 @@
 #include <PulsarSystem.hpp>
 #include <Config.hpp>
 #include <Settings/SettingsParam.hpp>
+#include <UI/UI.hpp>
 
 namespace Pulsar {
 
 namespace Settings {
 
-u8 Params::radioCount[Params::pageCount] ={
-    6, 6, 6, 5, 2, 2, 0//menu, race, host, OTT, KO, Extended Teams
-    
-};
-u8 Params::scrollerCount[Params::pageCount] ={ 2, 3, 1, 0, 2, 0, 1}; //menu, race (SOM + item mode + players), host, OTT, KO, Extended Teams
+#define ROW(filePage, fileSlot, bmgPage, bmgRow, optionCount) { filePage, fileSlot, bmgPage, bmgRow, optionCount }
+#define NAMES(index) UI::BMG_SETTINGS_PAGE + (index), UI::BMG_SETTINGS_TITLE + (index)
+#define USERNAMES(index) UI::BMG_USERSETTINGSOFFSET + UI::BMG_SETTINGS_PAGE + (index), UI::BMG_USERSETTINGSOFFSET + UI::BMG_SETTINGS_TITLE + (index)
 
-u8 Params::buttonsPerPagePerRow[Params::pageCount][Params::maxRadioCount] = //first row is PulsarSettingsType, 2nd is rowIdx of radio
-{
-    { 2, 2, 3, 2, 2, 2, 0, 0 }, //Menu: FastMenus (2), Layout (2), Music (3), InputViewer (2), BRSAR (2), Random combo (2)
-    { 2, 2, 2, 2, 3, 4, 0, 0 }, //Race: Mii (2), Speedup (2), Battle (2), FPS (2), SOM (3), TTItems (4)
-    { 2, 2, 4, 2, 2, 4, 0, 0 }, //Host: Mogi (2), HAW (2), CC (4), Mii Heads (2), Thunder Cloud (2), Track pool (4)
-    { 3, 3, 2, 2, 2, 0, 0, 0 }, //OTT
-    { 2, 2, 0, 0, 0, 0, 0, 0 }, //KO
-    { 2, 2, 0, 0, 0, 0, 0, 0 }, //Extended Teams
-    { 0, 0, 0, 0, 0, 0, 0, 0 }, //Language
+//File pages: 0 menu, 1 race, 2 host, 3 OTT, 4 KO, 5 Extended Teams, 6 language. Every row keeps the slot and the texts
+//it had before the panel was reorganised.
+const PageParams Params::uiPages[Params::uiPageCount] ={
+    { NAMES(0), 2, 1, //Menu
+        { ROW(0, SETTINGMENU_RADIO_FASTMENUS, 0, 0, 2), ROW(0, SETTINGMENU_RADIO_LAYOUT, 0, 1, 2) },
+        { ROW(0, SETTINGMENU_SCROLL_HUDCOLOR, 0, 1, 13) } },
+    { NAMES(1), 6, 3, //Race
+        { ROW(1, SETTINGRACE_RADIO_MII, 1, 0, 2), ROW(1, SETTINGRACE_RADIO_BATTLE, 1, 2, 2), ROW(1, SETTINGRACE_RADIO_FPS, 1, 3, 2),
+          ROW(1, SETTINGRACE_RADIO_SOM, 1, 4, 3), ROW(1, SETTINGRACE_RADIO_TT, 1, 5, 4),
+          ROW(0, SETTINGMENU_RADIO_INPUTVIEWER, 0, 3, 2) },
+        { ROW(1, SETTINGRACE_SCROLL_SOM, 1, 0, 4), ROW(1, SETTINGRACE_SCROLL_ITEMMODE, 1, 1, 3),
+          ROW(1, SETTINGRACE_SCROLL_PLAYERS, 1, 2, 2) } },
+    { NAMES(5), 1, 1, //Online
+        { ROW(0, SETTINGMENU_RADIO_RANDOMCOMBO, 0, 5, 2) },
+        { ROW(0, SETTINGMENU_SCROLL_BOOT, 0, 0, 5) } },
+    { NAMES(6), 3, 0, //Music
+        { ROW(0, SETTINGMENU_RADIO_MUSIC, 0, 2, 3), ROW(1, SETTINGRACE_RADIO_SPEEDUP, 1, 1, 2),
+          ROW(0, SETTINGMENU_RADIO_BRSAR, 0, 4, 2) },
+        { } },
+    { NAMES(2), 6, 1, //Host
+        { ROW(2, 0, 2, 0, 2), ROW(2, 1, 2, 1, 2), ROW(2, 2, 2, 2, 4), ROW(2, 3, 2, 3, 2), ROW(2, 4, 2, 4, 2),
+          ROW(2, 5, 2, 5, 4) },
+        { ROW(2, SETTINGHOST_SCROLL_GP_RACES, 2, 0, 7) } },
+    { NAMES(3), 5, 0, //OTT
+        { ROW(3, 0, 3, 0, 3), ROW(3, 1, 3, 1, 3), ROW(3, 2, 3, 2, 2), ROW(3, 3, 3, 3, 2), ROW(3, 4, 3, 4, 2) },
+        { } },
+    { NAMES(4), 2, 2, //KO
+        { ROW(4, SETTINGKO_ENABLED, 4, 0, 2), ROW(4, SETTINGKO_FINAL, 4, 1, 2) },
+        { ROW(4, SETTINGKO_KOPERRACE, 4, 0, 4), ROW(4, SETTINGKO_RACESPERKO, 4, 1, 4) } },
+    { USERNAMES(0), 2, 0, //Extended Teams
+        { ROW(5, RADIO_EXTENDEDTEAMSENABLED, 5, 0, 2), ROW(5, RADIO_EXTENDEDTEAMSLINE, 5, 1, 2) },
+        { } },
+    { USERNAMES(1), 1, 1, //Misc
+        { ROW(6, RADIO_PATCHES, 6, 0, 2) },
+        { ROW(6, SCROLLER_LANGUAGE, 6, 0, 2) } },
 };
 
-u8 Params::optionsPerPagePerScroller[Params::pageCount][Params::maxScrollerCount] =
-{
-    { 5, 13, 0, 0, 0, 0, 0, 0}, //Menu: Boot (5), HUD Color (13)
-    { 4, 3, 2, 0, 0, 0, 0, 0}, //Race: SOM (4), Race mode (3: normal, item rain, countdown), VS players (2: 12, 24)
-    { 7, 0, 0, 0, 0, 0, 0, 0}, //Host: GP (7)
-    { 0, 0, 0, 0, 0, 0, 0, 0}, //OTT
-    { 4, 4, 0, 0, 0, 0, 0, 0}, //KO
-    { 0, 0, 0, 0, 0, 0, 0, 0}, //Extended Teams
-    { 2, 0, 0, 0, 0, 0, 0, 0}, //Language: English, Italian
-};
+#undef ROW
+#undef NAMES
+#undef USERNAMES
 
 }//namespace Settings
 }//namespace Pulsar
-
-
-

@@ -8,22 +8,53 @@ namespace Pulsar {
 namespace UI { class SettingsPanel; }
 namespace Settings {
 
+/*
+The settings file has 5 Pulsar pages (Type) and 2 user pages (UserType), 6 radios and 6 scrollers each. The panel shows
+its own pages (UIPage): each row says where its value is saved and which texts it uses, so that rows can move between
+pages without touching the saves or the BMG. A file page or a BMG page is numbered 0-4 for the Pulsar ones, 5-6 for
+the user ones; its texts start at (page << 12), and at BMG_USERSETTINGSOFFSET + ((page - 5) << 12) for a user page.
+*/
+struct RowParams {
+    u8 filePage;
+    u8 fileSlot; //0-5 radio, 6-11 scroller
+    u8 bmgPage;
+    u8 bmgRow; //the radio or scroller index its texts use
+    u8 optionCount;
+};
+
+struct PageParams {
+    u32 nameBmg; //page select button
+    u32 titleBmg; //panel title, and the bottom text of the page select button
+    u8 radioCount;
+    u8 scrollerCount;
+    RowParams radios[8];
+    RowParams scrollers[8];
+};
+
+enum UIPage {
+    UIPAGE_MENU,
+    UIPAGE_RACE,
+    UIPAGE_ONLINE,
+    UIPAGE_MUSIC,
+    UIPAGE_HOST,
+    UIPAGE_OTT,
+    UIPAGE_KO,
+    UIPAGE_EXTENDEDTEAMS,
+    UIPAGE_MISC
+};
+
 class Params {
 public:
-    static const int pulsarPageCount = 5; 
+    static const int pulsarPageCount = 5; //of the settings file
     static const int userPageCount = 2; //in case you want to add user pages, change this and add the corresponding entries in the arrays below
     static const int pageCount = pulsarPageCount + userPageCount;
+    static const int uiPageCount = UIPAGE_MISC + 1; //of the panel
 
     static const int maxRadioCount = 8; //per page, due to space
     static const int maxScrollerCount = 8; //per page, due to space
     static const int scrollerSettingOffset = 6;
 
-    //Pulsar and User
-    static u8 radioCount[pageCount];
-    static u8 scrollerCount[pageCount];
-    static u8 buttonsPerPagePerRow[pageCount][maxRadioCount];
-    static u8 optionsPerPagePerScroller[pageCount][maxScrollerCount];
-
+    static const PageParams uiPages[uiPageCount];
 };
 
 //Contains all the settings. 
@@ -334,7 +365,15 @@ enum Language {
 };
 
 enum {
+    RADIO_PATCHES = 0, //same user page as the language: the Misc page of the panel
     SCROLLER_LANGUAGE = 0 + 6
+};
+
+//The loose files of the mod folder's "My Stuff" (IO/LooseArchiveOverrides.cpp). Enabled is 0 so that saves from
+//before the row keep them.
+enum MiscSettingPatches {
+    PATCHES_ENABLED,
+    PATCHES_DISABLED
 };
 
 }//namespace Pulsar

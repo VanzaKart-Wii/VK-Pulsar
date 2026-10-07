@@ -10,7 +10,7 @@ namespace UI {
 
 SettingsPageSelect::SettingsPageSelect() {
     externControlCount = 0;
-    internControlCount = Settings::Params::pageCount + 1;
+    internControlCount = Settings::Params::uiPageCount + 1;
     hasBackButton = true;
     nextPageId = PAGE_NONE;
     titleBmg = BMG_SETTINGS_TITLE;
@@ -57,7 +57,7 @@ void SettingsPageSelect::OnInit() {
 }
 
 UIControl* SettingsPageSelect::CreateControl(u32 id) {
-    if(id < Settings::Params::pageCount) {
+    if(id < Settings::Params::uiPageCount) {
         PushButton& button = this->pageButtons[id];
         this->AddControl(this->controlCount++, button, 0);
 
@@ -70,13 +70,7 @@ UIControl* SettingsPageSelect::CreateControl(u32 id) {
         button.SetOnSelectHandler(this->onButtonSelectHandler);
         button.SetOnDeselectHandler(this->onButtonDeselectHandler);
 
-        u32 bmgOffset = 0;
-        u32 pageIdx = id;
-        if(id >= Settings::Params::pulsarPageCount) {
-            bmgOffset = BMG_USERSETTINGSOFFSET;
-            pageIdx = id - Settings::Params::pulsarPageCount;
-        }
-        button.SetMessage(bmgOffset + BMG_SETTINGS_PAGE + pageIdx);
+        button.SetMessage(Settings::Params::uiPages[id].nameBmg);
 
         return &button;
     }
@@ -114,9 +108,7 @@ void SettingsPageSelect::SetButtonHandlers(PushButton& button) {
 }
 
 void SettingsPageSelect::OnActivate() {
-    if(Settings::Params::pageCount > 0) {
-        this->pageButtons[0].Select(0);
-    }
+    this->pageButtons[0].Select(0);
 
     this->bottomText->SetMessage(BMG_SETTINGS_BOTTOM);
 
@@ -127,22 +119,11 @@ void SettingsPageSelect::OnActivate() {
                             sectionId == SECTION_P1_WIFI_FROM_FROOM_RACE || sectionId == SECTION_P2_WIFI_FROM_FROOM_RACE ||
                             sectionId == SECTION_P1_WIFI_FROM_FIND_FRIEND || sectionId == SECTION_P2_WIFI_FROM_FIND_FRIEND);
 
-    for(int i = 0; i < Settings::Params::pageCount; ++i) {
+    for(int i = 0; i < Settings::Params::uiPageCount; ++i) {
+        //Misc (language, patches) reloads the menus when it changes
         bool isHidden = false;
-
-        if(isVotingSection) {
-            if(i == Settings::SETTINGSTYPE_KO ||
-               i == Settings::SETTINGSTYPE_OTT ||
-               i == (Settings::SETTINGSTYPE_LANGUAGE + Settings::Params::pulsarPageCount)) {
-                isHidden = true;
-            }
-        }
-
-        if(isOnlineSection) {
-            if(i == (Settings::SETTINGSTYPE_LANGUAGE + Settings::Params::pulsarPageCount)) {
-                isHidden = true;
-            }
-        }
+        if(isVotingSection) isHidden = i == Settings::UIPAGE_KO || i == Settings::UIPAGE_OTT || i == Settings::UIPAGE_MISC;
+        if(isOnlineSection) isHidden |= i == Settings::UIPAGE_MISC;
 
         this->pageButtons[i].isHidden = isHidden;
         this->pageButtons[i].manipulator.inaccessible = isHidden;
@@ -187,14 +168,6 @@ void SettingsPageSelect::OnButtonClick(PushButton& button, u32 hudSlotId) {
     SettingsPanel* settingsPanel = ExpSection::GetSection()->GetPulPage<SettingsPanel>();
     if(settingsPanel != nullptr) {
         settingsPanel->sheetIdx = selectedPage;
-        if(selectedPage < Settings::Params::pulsarPageCount) {
-            settingsPanel->catIdx = selectedPage;
-            settingsPanel->bmgOffset = 0;
-        }
-        else {
-            settingsPanel->catIdx = selectedPage - Settings::Params::pulsarPageCount;
-            settingsPanel->bmgOffset = BMG_USERSETTINGSOFFSET;
-        }
 
         this->nextPageId = static_cast<PageId>(SettingsPanel::id);
         this->EndStateAnimated(0, button.GetAnimationFrameSize());
@@ -213,13 +186,7 @@ void SettingsPageSelect::OnButtonSelect(PushButton& button, u32 hudSlotId) {
         this->bottomText->SetMessage(BMG_TEXT, &info);
         return;
     }
-    u32 bmgOffset = 0;
-    u32 pageIdx = button.buttonId;
-    if(button.buttonId >= Settings::Params::pulsarPageCount) {
-        bmgOffset = BMG_USERSETTINGSOFFSET;
-        pageIdx = button.buttonId - Settings::Params::pulsarPageCount;
-    }
-    this->bottomText->SetMessage(bmgOffset + BMG_SETTINGS_TITLE + pageIdx);
+    this->bottomText->SetMessage(Settings::Params::uiPages[button.buttonId].titleBmg);
 }
 
 void SettingsPageSelect::BeforeControlUpdate() {

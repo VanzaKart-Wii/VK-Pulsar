@@ -202,8 +202,10 @@ static char sCachedModFolder[OVERRIDE_MAX_PATH] = "";
 static char sLastUIArchiveBase[32] = "";
 static LooseOverrideScratch sLooseOverrideScratch = {};
 
+//Misc settings "Patches", as in Retro Rewind: off until the settings are loaded
 static bool AreLooseArchiveOverridesEnabled() {
-    return true;
+    if (!Settings::Mgr::IsCreated()) return false;
+    return Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_LANGUAGE, RADIO_PATCHES) == PATCHES_ENABLED;
 }
 
 static bool EndsWithIgnoreCase(const char* str, const char* suffix) {

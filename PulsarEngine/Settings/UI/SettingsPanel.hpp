@@ -63,7 +63,9 @@ private:
     void OnTextChange(TextUpDownValueControl::TextControl& text, u32 optionId);
     void LoadPrevMenuAndSaveSettings(PushButton& button);
     int GetNextSheetIdx(s32 direction); //1 for right, -1 for left
-    int GetNextBMGOffset(s32 direction);
+    static u8 GetFileValue(const Settings::RowParams& row);
+    static void SetFileValue(const Settings::RowParams& row, u8 value);
+    static u32 BmgBase(u8 bmgPage);
     u32 GetTextId(const TextUpDownValueControl::TextControl& text) const {
         const UIControl* parent = text.parentGroup->parentControl;
         for(u32 i = 0; i < Settings::Params::maxScrollerCount; ++i) {
@@ -87,14 +89,12 @@ private:
     PtmfHolder_2A<MenuInteractable, void, PushButton&, u32> onRightButtonClickHandler; //0x738
     PtmfHolder_2A<MenuInteractable, void, PushButton&, u32> onLeftButtonClickHandler; //0x74c
 
-    u8 radioSettings[Settings::Params::pageCount][Settings::Params::maxRadioCount];
-    u8 scrollerSettings[Settings::Params::pageCount][Settings::Params::maxScrollerCount];
+    u8 radioSettings[Settings::Params::uiPageCount][Settings::Params::maxRadioCount];
+    u8 scrollerSettings[Settings::Params::uiPageCount][Settings::Params::maxScrollerCount];
 
     
 public:
-    u32 sheetIdx; //0x750
-    u32 catIdx; //pulsarIdx or userIdx depending on the page
-    u32 bmgOffset;
+    u32 sheetIdx; //0x750, a Settings::UIPage
     CountDown* timer;  // Add this member
     s32 rouletteCounter;
     CountDownTimerControl countdownControl;

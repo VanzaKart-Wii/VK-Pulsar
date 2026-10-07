@@ -18,9 +18,7 @@ namespace UI {
 //SETTINGS PANEL
 SettingsPanel::SettingsPanel()
 {
-    bmgOffset = 0;
     sheetIdx = 0;
-    catIdx = 0;
     externControlCount = 1;  // Only save button, no left/right navigation
     internControlCount = Settings::Params::maxRadioCount + Settings::Params::maxScrollerCount;
     hasBackButton = false;
@@ -91,21 +89,18 @@ void SettingsPanel::OnInit() {
     //upDownControls = new UpDownControl[this->scrollersCount];
     //textUpDown = new TextUpDownValueControl[this->scrollersCount];
 
-    const Settings::Mgr& settings = Settings::Mgr::Get();
-    for(int i = 0; i < Settings::Params::pageCount; ++i) {
-        const bool isPulsarPage = i < Settings::Params::pulsarPageCount;
+    for(int i = 0; i < Settings::Params::uiPageCount; ++i) {
+        const Settings::PageParams& page = Settings::Params::uiPages[i];
         //A value past the options a row has (a save from a build that had more of them) would make the
         //control select a button that doesn't exist and crash, so it falls back to the first option
-        for(int radioIdx = 0; radioIdx < Settings::Params::radioCount[i]; ++radioIdx) {
-            u8 value = isPulsarPage ? settings.GetSettingValue(static_cast<Settings::Type>(i), radioIdx)
-                : settings.GetUserSettingValue(static_cast<Settings::UserType>(i - Settings::Params::pulsarPageCount), radioIdx);
-            if(value >= Settings::Params::buttonsPerPagePerRow[i][radioIdx]) value = 0;
+        for(int radioIdx = 0; radioIdx < page.radioCount; ++radioIdx) {
+            u8 value = GetFileValue(page.radios[radioIdx]);
+            if(value >= page.radios[radioIdx].optionCount) value = 0;
             this->radioSettings[i][radioIdx] = value;
         }
-        for(int scrollerIdx = 0; scrollerIdx < Settings::Params::scrollerCount[i]; ++scrollerIdx) {
-            u8 value = isPulsarPage ? settings.GetSettingValue(static_cast<Settings::Type>(i), scrollerIdx + 6)
-                : settings.GetUserSettingValue(static_cast<Settings::UserType>(i - Settings::Params::pulsarPageCount), scrollerIdx + 6);
-            if(value >= Settings::Params::optionsPerPagePerScroller[i][scrollerIdx]) value = 0;
+        for(int scrollerIdx = 0; scrollerIdx < page.scrollerCount; ++scrollerIdx) {
+            u8 value = GetFileValue(page.scrollers[scrollerIdx]);
+            if(value >= page.scrollers[scrollerIdx].optionCount) value = 0;
             this->scrollerSettings[i][scrollerIdx] = value;
         }
     }
@@ -180,7 +175,8 @@ void SettingsPanel::SetButtonHandlers(PushButton& button) {
 }
 
 void SettingsPanel::OnActivate() {
-    this->titleBmg = this->bmgOffset + BMG_SETTINGS_TITLE + this->catIdx;
+    const Settings::PageParams& page = Settings::Params::uiPages[this->sheetIdx];
+    this->titleBmg = page.titleBmg;
     this->externControls[0]->SelectInitial(0);
     this->bottomText->SetMessage(BMG_SETTINGS_BOTTOM); //no need for any offset here as this is the default "save" bottom msg
     // Check if we're in any of the voting sections
@@ -190,81 +186,57 @@ void SettingsPanel::OnActivate() {
 
     for(int i = 0; i < Settings::Params::maxRadioCount; ++i) {
         RadioButtonControl& radio = this->radioButtonControls[i];
-        bool isDisabled = false;
-        if(i >= Settings::Params::radioCount[this->sheetIdx]) isDisabled = true;
+        const bool isDisabled = i >= page.radioCount;
         radio.isHidden = isDisabled;
         radio.manipulator.inaccessible = isDisabled;
 
         if(!isDisabled) {
-            radio.buttonsCount = Settings::Params::buttonsPerPagePerRow[this->sheetIdx][radio.id];
+            const Settings::RowParams& row = page.radios[radio.id];
+            radio.buttonsCount = row.optionCount;
             const u8 setting = this->radioSettings[this->sheetIdx][radio.id];
             radio.chosenButtonId = setting;
             radio.selectedButtonId = setting;
-            u32 bmgCategory = this->bmgOffset + BMG_RADIO_SETTINGS + (this->catIdx << 12);
-            radio.SetMessage(radio.id + bmgCategory);
+            const u32 bmgCategory = BmgBase(row.bmgPage) + BMG_RADIO_SETTINGS;
+            radio.SetMessage(row.bmgRow + bmgCategory);
 
             for(int j = 0; j < 4; ++j) {
-                bool isHidden = false;
-                if(j >= Settings::Params::buttonsPerPagePerRow[this->sheetIdx][radio.id]) isHidden = true;
+                const bool isHidden = j >= row.optionCount;
                 radio.optionButtonsArray[j].isHidden = isHidden;
-                if(!isHidden) radio.optionButtonsArray[j].SetMessage((radio.id + 1 << 4) + j + bmgCategory);
+                if(!isHidden) radio.optionButtonsArray[j].SetMessage((row.bmgRow + 1 << 4) + j + bmgCategory);
             }
         }
     }
     for(int i = 0; i < Settings::Params::maxScrollerCount; ++i) {
         UpDownControl& scroller = this->upDownControls[i];
         TextUpDownValueControl& valueControl = this->textUpDown[i];
-        bool isDisabled = false;
-        if(i >= Settings::Params::scrollerCount[this->sheetIdx]) isDisabled = true;
+        const bool isDisabled = i >= page.scrollerCount;
         scroller.isHidden = isDisabled;
         scroller.manipulator.inaccessible = isDisabled;
-        scroller.optionsCount = Settings::Params::optionsPerPagePerScroller[this->sheetIdx][i];
+        scroller.optionsCount = isDisabled ? 0 : page.scrollers[i].optionCount;
         valueControl.isHidden = isDisabled;
         if(!isDisabled) {
             scroller.curSelectedOption = this->scrollerSettings[this->sheetIdx][i];
-            u32 bmgCategory = this->bmgOffset + BMG_SCROLLER_SETTINGS + (this->catIdx << 12);
-            scroller.SetMessage(scroller.id + bmgCategory);
+            scroller.SetMessage(page.scrollers[i].bmgRow + BmgBase(page.scrollers[i].bmgPage) + BMG_SCROLLER_SETTINGS);
             scroller.SelectInitial(scroller.curSelectedOption);
         }
-
-
-
     }
     MenuInteractable::OnActivate();
 
-        // Hide specific settings pages in voting sections
-    if(isVotingSection) {
-        if (this->sheetIdx == Settings::SETTINGSTYPE_KO || 
-            this->sheetIdx == Settings::SETTINGSTYPE_OTT ||
-            this->sheetIdx == Settings::SETTINGSTYPE_HOST ||
-            this->sheetIdx == Settings::SETTINGSTYPE_LANGUAGE ||
-            this->sheetIdx == Settings::SETTINGSTYPE_EXTENDEDTEAMS) {
-            return;
-        }
-    }
-
-    // Hide/show scroller controls based on section
+    //In a voting section the scrollers of the user pages are hidden (the Misc page can't be opened there)
+    const bool hideScrollers = isVotingSection && this->sheetIdx >= Settings::UIPAGE_EXTENDEDTEAMS;
     for(int i = 0; i < Settings::Params::maxScrollerCount; ++i) {
         UpDownControl& upDown = this->upDownControls[i];
         TextUpDownValueControl& text = this->textUpDown[i];
-        
-        if(isVotingSection) {
-            // Hide scrollers and make them completely inaccessible
-            upDown.isHidden = true;
-            upDown.manipulator.inaccessible = true;
-            text.isHidden = true;
-        } else {
-            bool isDisabled = i >= Settings::Params::scrollerCount[this->sheetIdx];
-            upDown.isHidden = isDisabled;
-            upDown.manipulator.inaccessible = isDisabled;
-            text.isHidden = isDisabled;
-        }
+        const bool isDisabled = hideScrollers || i >= page.scrollerCount;
+        upDown.isHidden = isDisabled;
+        upDown.manipulator.inaccessible = isDisabled;
+        text.isHidden = isDisabled;
     }
 
     // Make sure radio buttons remain accessible
     for(int i = 0; i < Settings::Params::maxRadioCount; ++i) {
         RadioButtonControl& radio = this->radioButtonControls[i];
-        bool isDisabled = i >= Settings::Params::radioCount[this->sheetIdx];
+        const bool isDisabled = i >= page.radioCount;
         radio.isHidden = isDisabled;
         radio.manipulator.inaccessible = isDisabled;
     }
@@ -293,6 +265,7 @@ ManipulatorManager& SettingsPanel::GetManipulatorManager() {
 
 void SettingsPanel::LoadPrevMenuAndSaveSettings(PushButton& button) {
     const u8 languageBefore = Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_LANGUAGE, SCROLLER_LANGUAGE);
+    const u8 patchesBefore = Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_LANGUAGE, RADIO_PATCHES);
 
     this->LoadPrevPage(button);
     // Navigate back to SettingsPageSelect instead of the original menu
@@ -301,34 +274,52 @@ void SettingsPanel::LoadPrevMenuAndSaveSettings(PushButton& button) {
     this->SaveSettings(true);
 
     const u8 languageAfter = Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_LANGUAGE, SCROLLER_LANGUAGE);
-    if(languageAfter != languageBefore) {
-        Languages::ApplyArchiveLanguage();
+    const u8 patchesAfter = Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_LANGUAGE, RADIO_PATCHES);
+    //The menus are loaded again, in the new language or with/without the loose files of "My Stuff"
+    if(languageAfter != languageBefore || patchesAfter != patchesBefore) {
+        if(languageAfter != languageBefore) Languages::ApplyArchiveLanguage();
         SectionMgr* sectionMgr = SectionMgr::sInstance;
         sectionMgr->nextSectionId = sectionMgr->curSection->sectionId;
         sectionMgr->RequestSceneReinit(0, 0xFF);
     }
 }
 
+//Where a row's value is saved, and where its texts start
+u8 SettingsPanel::GetFileValue(const Settings::RowParams& row) {
+    const Settings::Mgr& settings = Settings::Mgr::Get();
+    if(row.filePage < Settings::Params::pulsarPageCount) {
+        return settings.GetSettingValue(static_cast<Settings::Type>(row.filePage), row.fileSlot);
+    }
+    return settings.GetUserSettingValue(static_cast<Settings::UserType>(row.filePage - Settings::Params::pulsarPageCount),
+        row.fileSlot);
+}
+
+void SettingsPanel::SetFileValue(const Settings::RowParams& row, u8 value) {
+    Settings::Mgr* settings = Settings::Mgr::sInstance;
+    if(row.filePage < Settings::Params::pulsarPageCount) {
+        settings->SetSettingValue(static_cast<Settings::Type>(row.filePage), row.fileSlot, value);
+    }
+    else settings->SetUserSettingValue(static_cast<Settings::UserType>(row.filePage - Settings::Params::pulsarPageCount),
+        row.fileSlot, value);
+}
+
+u32 SettingsPanel::BmgBase(u8 bmgPage) {
+    if(bmgPage < Settings::Params::pulsarPageCount) return bmgPage << 12;
+    return BMG_USERSETTINGSOFFSET + (bmgPage - Settings::Params::pulsarPageCount << 12);
+}
+
 //On Save Click/Back Press, is called and updates PulsarSettings
 void SettingsPanel::SaveSettings(bool writeFile) {
-    const ExpSection* section = ExpSection::GetSection();
-    Settings::Mgr* settings = Settings::Mgr::sInstance;
-
-    for(int count = 0; count < Settings::Params::pageCount; ++count) {
-
-        const bool isPulsarPage = count < Settings::Params::pulsarPageCount;
-        for(int i = 0; i < Settings::Params::radioCount[count]; ++i) {
-            const u8 value = this->radioSettings[count][i];
-            if(isPulsarPage) settings->SetSettingValue(static_cast<Settings::Type>(count), i, value);
-            else settings->SetUserSettingValue(static_cast<Settings::UserType>(count - Settings::Params::pulsarPageCount), i, value);
+    for(int i = 0; i < Settings::Params::uiPageCount; ++i) {
+        const Settings::PageParams& page = Settings::Params::uiPages[i];
+        for(int radioIdx = 0; radioIdx < page.radioCount; ++radioIdx) {
+            SetFileValue(page.radios[radioIdx], this->radioSettings[i][radioIdx]);
         }
-        for(int i = 0; i < Settings::Params::scrollerCount[count]; ++i) {
-            const u8 value = this->scrollerSettings[count][i];
-            if(isPulsarPage) settings->SetSettingValue(static_cast<Settings::Type>(count), i + Settings::Params::scrollerSettingOffset, value);
-            else settings->SetUserSettingValue(static_cast<Settings::UserType>(count - Settings::Params::pulsarPageCount), i + Settings::Params::scrollerSettingOffset, value);
+        for(int scrollerIdx = 0; scrollerIdx < page.scrollerCount; ++scrollerIdx) {
+            SetFileValue(page.scrollers[scrollerIdx], this->scrollerSettings[i][scrollerIdx]);
         }
     }
-    settings->Update();
+    Settings::Mgr::sInstance->Update();
 }
 
 void SettingsPanel::OnBackPress(u32 hudSlotId) {
@@ -353,14 +344,6 @@ void SettingsPanel::OnButtonClick(PushButton& button, u32 direction) {
     this->nextPageId = this->pageId;
     const int nextIdx = this->GetNextSheetIdx(direction);
     this->sheetIdx = nextIdx;
-    if(nextIdx < Settings::Params::pulsarPageCount) {
-        this->catIdx = nextIdx;
-        this->bmgOffset = 0;
-    }
-    else {
-        this->catIdx = nextIdx - Settings::Params::pulsarPageCount;
-        this->bmgOffset = BMG_USERSETTINGSOFFSET;
-    }
 
     this->EndStateAnimated(0, button.GetAnimationFrameSize());
     this->SaveSettings(false);
@@ -371,7 +354,8 @@ void SettingsPanel::OnRadioButtonClick(RadioButtonControl& radioButtonControl, u
 }
 
 void SettingsPanel::OnRadioButtonChange(RadioButtonControl& radioButtonControl, u32 hudSlotId, u32 optionId) {
-    this->bottomText->SetMessage(this->bmgOffset + BMG_RADIO_SETTINGS + (this->catIdx << 12) + (radioButtonControl.id + 1 << 8) + optionId);
+    const Settings::RowParams& row = Settings::Params::uiPages[this->sheetIdx].radios[radioButtonControl.id];
+    this->bottomText->SetMessage(BmgBase(row.bmgPage) + BMG_RADIO_SETTINGS + (row.bmgRow + 1 << 8) + optionId);
 }
 
 void SettingsPanel::OnUpDownClick(UpDownControl& upDownControl, u32 hudSlotId) {
@@ -384,29 +368,25 @@ void SettingsPanel::OnTextChange(TextUpDownValueControl::TextControl& text, u32 
         return;
     }
 
-    const u32 bmgId = this->bmgOffset + BMG_SCROLLER_SETTINGS + (this->catIdx << 12) + optionId;
     u32 id = this->GetTextId(text);
     this->scrollerSettings[this->sheetIdx][id] = optionId;
 
-    text.SetMessage(bmgId + (id + 1 << 4));
+    const Settings::RowParams& row = Settings::Params::uiPages[this->sheetIdx].scrollers[id];
+    const u32 bmgId = BmgBase(row.bmgPage) + BMG_SCROLLER_SETTINGS + optionId;
+    text.SetMessage(bmgId + (row.bmgRow + 1 << 4));
     if(!this->externControls[0]->IsSelected()) {
-        this->bottomText->SetMessage(bmgId + (id + 1 << 8));
+        this->bottomText->SetMessage(bmgId + (row.bmgRow + 1 << 8));
     }
 };
 
 void SettingsPanel::OnUpDownSelect(UpDownControl& upDownControl, u32 hudSlotId) {
-    const u32 bmgId = this->bmgOffset + BMG_SCROLLER_SETTINGS + (this->catIdx << 12) + (upDownControl.id + 1 << 8) + upDownControl.curSelectedOption;
+    const Settings::RowParams& row = Settings::Params::uiPages[this->sheetIdx].scrollers[upDownControl.id];
+    const u32 bmgId = BmgBase(row.bmgPage) + BMG_SCROLLER_SETTINGS + (row.bmgRow + 1 << 8) + upDownControl.curSelectedOption;
     this->bottomText->SetMessage(bmgId);
 }
 
 int SettingsPanel::GetNextSheetIdx(s32 direction) {
-    return (this->sheetIdx + direction + Settings::Params::pageCount) % Settings::Params::pageCount;
-}
-
-int SettingsPanel::GetNextBMGOffset(s32 direction) {
-    const u32 nextIdx = this->GetNextSheetIdx(direction);
-    if(nextIdx < Settings::Params::pulsarPageCount) return nextIdx;
-    else return BMG_USERSETTINGSOFFSET + nextIdx - Settings::Params::pulsarPageCount;
+    return (this->sheetIdx + direction + Settings::Params::uiPageCount) % Settings::Params::uiPageCount;
 }
 
 void SettingsPanel::BeforeControlUpdate() {
