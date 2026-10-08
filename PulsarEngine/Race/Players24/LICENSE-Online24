@@ -1,0 +1,23 @@
+VanzaKart online 24 players
+Copyright (c) 2026 ErSossiega (VanzaKart)
+
+The online 24 players code in this directory, the files whose name starts with
+"Online24" (Online24*.cpp, Online24*.hpp, Online24*.inc), is licensed under the
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
+(CC BY-NC-SA 4.0):
+
+    https://creativecommons.org/licenses/by-nc-sa/4.0/
+    Full legal code: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+In short, you may copy, modify and redistribute it, including in other mods,
+provided that:
+
+  - Attribution: you credit "ErSossiega (VanzaKart)" as the author, link to this
+    license and state what you changed;
+  - NonCommercial: you do not use it, or anything built with it, for commercial
+    purposes;
+  - ShareAlike: you distribute your changes under this same license.
+
+The rest of the repository keeps its own licenses: LICENSE (MIT, Pulsar by
+MelgMKW), LICENSE.txt (GPLv3), and LICENSE-Offline24 (MIT) for the parts of the
+offline 24 players code ported from Offline24.
