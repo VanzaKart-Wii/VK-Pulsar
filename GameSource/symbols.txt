@@ -2009,6 +2009,7 @@ Append__Q25RKNet12PacketHolder<v>FPCvUi = 0x8065a38c
 sInstance__Q25RKNet13SELECTHandler = 0x809c2100
 GetTeam__Q25RKNet13SELECTHandlerCFUcUc = 0x80660654
 GetOwnPlayerIdToAid__Q25RKNet13SELECTHandlerCFv = 0x806604cc
+GetStarRank__Q25RKNet13SELECTHandlerCFUcUc = 0x8066060c
 
 #ROOM
 sInstance__Q25RKNet11ROOMHandler = 0x809c20e0
@@ -2024,6 +2025,7 @@ GetLocalPlayerId__Q25RKNet10ControllerCFi = 0x80659d58
 
 #RH1
 sInstance__Q25RKNet10RH1Handler = 0x809c2118
+GetStarRank__Q25RKNet10RH1HandlerFUcUc = 0x8066454c
 GetPlayerRH1Timer__Q25RKNet9PacketMgrCFUi = 0x806544a8
 GetPlayerLagFrames__Q25RKNet9PacketMgrCFUi = 0x80654568
 

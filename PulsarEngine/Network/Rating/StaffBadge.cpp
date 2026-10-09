@@ -1,5 +1,6 @@
 #include <Network/Rating/StaffBadge.hpp>
 #include <Network/Rating/RatingConfig.hpp>
+#include <Network/Rating/RankManager.hpp>
 #include <MarioKartWii/Race/RaceData.hpp>
 #include <MarioKartWii/RKSYS/RKSYSMgr.hpp>
 #include <MarioKartWii/RKNet/RKNetController.hpp>
@@ -22,7 +23,8 @@ struct Member {
 */
 static const Member sMembers[] = {
     { 426201762344ULL, ROLE_LEADER },  // 4262-0176-2344, creator
-    { 164208757382ULL, ROLE_LEADER },
+    //{ 164208757382ULL, ROLE_LEADER },
+    { 164208757382ULL, ROLE_BETA_TESTER },
     { 20202ULL, ROLE_CREATIVE_DIRECTOR },
     { 1000000065ULL, ROLE_CREATIVE_DIRECTOR },
     { 500000060ULL, ROLE_CREATIVE_DIRECTOR },
@@ -114,6 +116,19 @@ Role GetForPlayer(u8 playerId) {
 wchar_t GetBadgeGlyph(Role role) {
     if (role == ROLE_NONE || role >= ROLE_COUNT) return 0;
     return (wchar_t)(Config::STAFF_GLYPH_BASE + role);
+}
+
+u8 ResolveRankIconIndex(u8 aid, u8 playerIndexOnConsole, u8 sentIndex) {
+    const RKNet::Controller* ctrl = RKNet::Controller::sInstance;
+    if (ctrl == nullptr || aid >= 24) return sentIndex;
+
+    const bool isLocal = aid == ctrl->subs[ctrl->currentSub].localAid;
+    const Role role = isLocal ? GetLocal(playerIndexOnConsole) : GetRemote(aid, playerIndexOnConsole);
+    if (role != ROLE_NONE) return (u8)(Config::STAFF_ICON_BASE + role);
+
+    // Not on the list but sent a staff index: show the rank it advertised instead.
+    if (sentIndex > Config::MAX_RANK) return isLocal ? 0 : Rank::GetRemote(aid, playerIndexOnConsole);
+    return sentIndex;
 }
 
 u32 GetIconBMG(Role role) {

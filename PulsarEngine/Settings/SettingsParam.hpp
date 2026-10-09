@@ -366,6 +366,7 @@ enum Language {
 
 enum {
     RADIO_PATCHES = 0, //same user page as the language: the Misc page of the panel
+    RADIO_HARDAI = 1, //same user page and panel page
     SCROLLER_LANGUAGE = 0 + 6
 };
 
@@ -374,6 +375,12 @@ enum {
 enum MiscSettingPatches {
     PATCHES_ENABLED,
     PATCHES_DISABLED
+};
+
+//Race/HardAI.cpp: "Impossible CPUs". Disabled is 0 so that saves from before the row keep it off.
+enum RaceSettingHardAI {
+    HARDAI_DISABLED,
+    HARDAI_ENABLED
 };
 
 }//namespace Pulsar

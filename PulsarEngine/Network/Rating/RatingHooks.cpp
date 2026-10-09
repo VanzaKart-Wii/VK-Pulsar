@@ -10,6 +10,8 @@
 #include <PulsarSystem.hpp>
 #include <MarioKartWii/RKSYS/RKSYSMgr.hpp>
 #include <MarioKartWii/RKNet/RKNetController.hpp>
+#include <MarioKartWii/RKNet/RH1.hpp>
+#include <MarioKartWii/RKNet/SELECT.hpp>
 
 /*
     Every address the rating system patches lives here, so the logic modules stay free
@@ -97,6 +99,22 @@ static void ApplyRankIcon() {
 }
 static SectionLoadHook rankIconHook(ApplyRankIcon);
 // On reception the index goes through SetRankBMG, replaced in RatingUI.cpp: only a staff badge is drawn in a race.
+
+/*
+    SetRankBMG has two callers, and each takes the index straight from the sender's packet:
+    0x8060a288 from RH1 when the race starts (race and results), 0x80651390 from SELECT.
+    Both GetStarRank calls go through Staff::ResolveRankIconIndex, so the staff badge comes
+    from this console's list and not from whatever build the sender runs.
+*/
+static u8 RH1StarRank(RKNet::RH1Handler* handler, u8 aid, u8 slot) {
+    return Staff::ResolveRankIconIndex(aid, slot, handler->GetStarRank(aid, slot));
+}
+kmCall(0x8060a288, RH1StarRank);
+
+static u8 SELECTStarRank(const RKNet::SELECTHandler* handler, u8 aid, u8 slot) {
+    return Staff::ResolveRankIconIndex(aid, slot, handler->GetStarRank(aid, slot));
+}
+kmCall(0x80651390, SELECTStarRank);
 #endif
 
 // --------------------------------------------------------------- licence mirror

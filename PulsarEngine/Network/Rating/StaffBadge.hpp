@@ -48,6 +48,17 @@ Role GetForPlayer(u8 playerId);
 // Glyph for a role, or 0 when the role draws nothing.
 wchar_t GetBadgeGlyph(Role role);
 
+/*
+    The rank icon index to draw for a console slot, given the one that console sent.
+
+    The icon index rides the sender's starRank (RatingHooks), so on its own the badge in
+    the race and the results is whatever the sender's build decided: a console on a build
+    that predates a role, or that hand-edits the packet, would show the wrong one. Here the
+    staff part is resolved from the list on this console like everywhere else, and only
+    the prestige rank is taken from the sender.
+*/
+u8 ResolveRankIconIndex(u8 aid, u8 playerIndexOnConsole, u8 sentIndex);
+
 // The message that draws a role's badge in a race (OnlineParams::rankBMG, the handle_text panes on the right of
 // the name), or 0 when the role draws nothing.
 u32 GetIconBMG(Role role);
