@@ -5,7 +5,8 @@
 #include <MarioKartWii/Mii/MiiGroup.hpp>
 #include <MarioKartWii/Scene/GameScene.hpp>
 #include <MarioKartWii/UI/Section/SectionMgr.hpp>
-#include <core/egg/mem/Heap.hpp>
+#include <core/egg/mem/ExpHeap.hpp>
+#include <core/RK/RKSystem.hpp>
 #include <Network/Rating/StaffBadge.hpp>
 #include <MarioKartWii/RKNet/RKNetController.hpp>
 
@@ -18,6 +19,12 @@ static const u32 extraMiisMargin = 0x120000 + 0x200000;
 static MiiGroup* extraMiis = nullptr;
 static u32 extraMiisLoaded = 0;
 static bool MiisSetReady();
+
+static const u32 menuMiisHeapSize = 0x10000;
+static const u32 menuMiisNeeded = 0xf000;
+static const u32 systemHeapMargin = 0x40000;
+static EGG::ExpHeap* menuMiisHeap = nullptr;
+static bool inMenuHeap = false;
 
 static MiiGroup* PlayerMiis() {
     const SectionMgr* mgr = SectionMgr::sInstance;
@@ -48,34 +55,8 @@ void ReportRaceMemory(const char* step) {
 #endif
 
 static u32 reportedNoTexture = 0;
-static void LoadRacerMiis() {
-    extraMiisLoaded = 0;
-    reportedNoTexture = 0;
-    extraMiis = nullptr;
-    if(!IsOnline24()) return;
-    if(AidOfPlayer(vanillaPlayers) == 0xFF) {
-        if(RoomPlayerCount() > vanillaPlayers) OSReport("[VK 24P] Miis 13-24: none (no id 12, %d in the room)\n", RoomPlayerCount());
-        return;
-    }
-    if(!MiisSetReady()) {
-        OSReport("[VK 24P] Miis 13-24: none (patches not in)\n");
-        return;
-    }
-    const GameScene* scene = GameScene::GetCurrent();
-    const SectionMgr* mgr = SectionMgr::sInstance;
-    if(scene == nullptr || scene->id != SCENE_ID_RACE || mgr == nullptr || mgr->sectionParams == nullptr) {
-        OSReport("[VK 24P] Miis 13-24: none (scene %d)\n", scene != nullptr ? scene->id : -1);
-        return;
-    }
-    EGG::Heap* heap = scene->structsHeaps.heaps[1];
-    const u32 free = heap != nullptr ? heap->getAllocatableSize(4) : 0;
-    if(free < extraMiisSize + extraMiisMargin) {
-        OSReport("[VK 24P] Miis 13-24: %x free in MEM2, the racers keep their character\n", free);
-        return;
-    }
-    MiiGroup* group = new(heap, 4) MiiGroup;
-    group->Init(vanillaPlayers, extraMiisTextures, heap);
-    extraMiis = group;
+
+static void FillGroup(MiiGroup* group, const SectionMgr* mgr) {
     for(u8 id = vanillaPlayers; id < maxPlayers; ++id) {
         u8 aid, slot;
         bool isLocal;
@@ -100,6 +81,76 @@ static void LoadRacerMiis() {
     typedef void (*DrawQueuedFunc)(void* maker);
     void* maker = *reinterpret_cast<void**>(Port(0x809c2df0));
     if(maker != nullptr && extraMiisLoaded != 0) reinterpret_cast<DrawQueuedFunc>(Port(0x80782528))(maker);
+}
+
+static void ResetRacerMiis() {
+    if(inMenuHeap && extraMiis != nullptr) delete extraMiis;
+    inMenuHeap = false;
+    extraMiis = nullptr;
+    extraMiisLoaded = 0;
+    reportedNoTexture = 0;
+}
+
+static EGG::ExpHeap* MenuMiisHeap() {
+    if(menuMiisHeap != nullptr) return menuMiisHeap;
+    EGG::ExpHeap* system = RKSystem::mInstance.EGGSystem;
+    const u32 free = system != nullptr ? system->getAllocatableSize(4) : 0;
+    if(free >= menuMiisHeapSize + systemHeapMargin) menuMiisHeap = EGG::ExpHeap::Create(menuMiisHeapSize, system, 0);
+    OSReport("[VK 24P] Miis 13-24: system heap %u KiB free, %s\n", free >> 10,
+        menuMiisHeap != nullptr ? "64 KiB kept for them" : "they load with the race");
+    return menuMiisHeap;
+}
+
+void LoadRacerMiisInMenu() {
+    ResetRacerMiis();
+    if(!IsOnline24() || AidOfPlayer(vanillaPlayers) == 0xFF || !MiisSetReady()) return;
+    const SectionMgr* mgr = SectionMgr::sInstance;
+    if(mgr == nullptr || mgr->sectionParams == nullptr || mgr->curSection == nullptr) return;
+    EGG::ExpHeap* heap = MenuMiisHeap();
+    if(heap == nullptr) return;
+    if(heap->getAllocatableSize(0x20) < menuMiisNeeded) {
+        OSReport("[VK 24P] Miis 13-24: %u KiB in their heap, they load with the race\n", heap->getAllocatableSize(0x20) >> 10);
+        return;
+    }
+    const EGG::Heap* previous = heap->BecomeCurrentHeap();
+    MiiGroup* group = new(heap, 4) MiiGroup;
+    group->Init(vanillaPlayers, extraMiisTextures, heap);
+    previous->BecomeCurrentHeap();
+    extraMiis = group;
+    inMenuHeap = true;
+    FillGroup(group, mgr);
+    OSReport("[VK 24P] Miis 13-24: loaded %03x in the menu, %u KiB left in their heap\n", extraMiisLoaded,
+        heap->getAllocatableSize(4) >> 10);
+}
+
+static void LoadRacerMiis() {
+    if(inMenuHeap) return;
+    ResetRacerMiis();
+    if(!IsOnline24()) return;
+    if(AidOfPlayer(vanillaPlayers) == 0xFF) {
+        if(RoomPlayerCount() > vanillaPlayers) OSReport("[VK 24P] Miis 13-24: none (no id 12, %d in the room)\n", RoomPlayerCount());
+        return;
+    }
+    if(!MiisSetReady()) {
+        OSReport("[VK 24P] Miis 13-24: none (patches not in)\n");
+        return;
+    }
+    const GameScene* scene = GameScene::GetCurrent();
+    const SectionMgr* mgr = SectionMgr::sInstance;
+    if(scene == nullptr || scene->id != SCENE_ID_RACE || mgr == nullptr || mgr->sectionParams == nullptr) {
+        OSReport("[VK 24P] Miis 13-24: none (scene %d)\n", scene != nullptr ? scene->id : -1);
+        return;
+    }
+    EGG::Heap* heap = scene->structsHeaps.heaps[1];
+    const u32 free = heap != nullptr ? heap->getAllocatableSize(4) : 0;
+    if(free < extraMiisSize + extraMiisMargin) {
+        OSReport("[VK 24P] Miis 13-24: %x free in MEM2, the racers keep their character\n", free);
+        return;
+    }
+    MiiGroup* group = new(heap, 4) MiiGroup;
+    group->Init(vanillaPlayers, extraMiisTextures, heap);
+    extraMiis = group;
+    FillGroup(group, mgr);
     OSReport("[VK 24P] Miis 13-24: loaded %03x, %u KiB free in MEM2\n", extraMiisLoaded, heap->getAllocatableSize(4) >> 10);
 }
 
@@ -119,7 +170,8 @@ static void InitSection(void* section, u32 id) {
         LoadRacerMiis();
         ReportRaceMemory("after the Miis");
     }
-    else if(extraMiis != nullptr && GameScene::GetCurrent() != nullptr && GameScene::GetCurrent()->id != SCENE_ID_RACE) {
+    else if(extraMiis != nullptr && !inMenuHeap && GameScene::GetCurrent() != nullptr
+        && GameScene::GetCurrent()->id != SCENE_ID_RACE) {
         extraMiis = nullptr;
         extraMiisLoaded = 0;
     }

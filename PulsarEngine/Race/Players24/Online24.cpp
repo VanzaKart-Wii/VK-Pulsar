@@ -396,6 +396,7 @@ static void MenuDataSetup(void* r3, void* r4, void* r5, void* r6) {
             reinterpret_cast<CopyMiiFunc>(Port(0x805fabf4))(&miis, owner, id);
         }
     }
+    LoadRacerMiisInMenu();
 }
 
 typedef void (*PacketMgrFunc)(RKNet::PacketMgr* mgr);

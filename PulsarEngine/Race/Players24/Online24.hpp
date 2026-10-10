@@ -15,6 +15,7 @@ bool HasNoMiiSlot(u8 id);
 bool ShowsCharacter(u8 id);
 bool KeepsCharacterHead(u8 id);
 bool HasRacerMii(u8 id);
+void LoadRacerMiisInMenu();
 Mii* RacerMiiPast12(const MiiGroup* group, u8 idx);
 #ifdef P24TEST
 void ReportRaceMemory(const char* step);
