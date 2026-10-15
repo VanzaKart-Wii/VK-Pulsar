@@ -104,6 +104,9 @@ struct PulSELECT : public RKNet::SELECTPacket {
     //Ids 12-23 of the host's id table (playerIdToAid has 0-11): sent only in a 24 players room, everywhere else the
     //packet stops before them (PULSELECT_BASE_SIZE) and stays as it was (Race/Players24/Online24Consoles.cpp)
     u8 playerIdToAidExt[12];
+    //Red/blue team of aids 12-23 (bit aid - 12 set: red; one player per console there), the rest of the teams being
+    //in battleTypeAndTeams. Sent with playerIdToAidExt (Race/Players24/Online24Consoles.cpp, DecideTeams24)
+    u16 teamsExt;
 };
 
 struct PulRACEDATA : public RKNet::RACEDATAPacket {};
@@ -114,7 +117,7 @@ struct PulEVENT : public    RKNet::EVENTPacket {}; //NOT RECOMMENDED as this has
 
 static_assert(sizeof(PulROOM) < sizeof(PulSELECT), "ROOM SELECT");
 static_assert(sizeof(PulRH1) == 51, "PulRH1 cambiata: aggiorna MatchHeader in mkwSecurity.cpp");
-static_assert(sizeof(PulSELECT) == 110, "PulSELECT cambiata: aggiorna RoomSelect in mkwSecurity.cpp");
+static_assert(sizeof(PulSELECT) == 112, "PulSELECT cambiata: aggiorna RoomSelect in mkwSecurity.cpp");
 static const u32 PULSELECT_BASE_SIZE = 98; //what is sent outside a 24 players room
 
 class ExpSELECTHandler {
@@ -125,7 +128,7 @@ public:
     RKNet::OnlineMode  mode; //from page 0x90 OnInit SectionId Switch
     u32 unknown_0x4;
     PulSELECT toSendPacket; //0x8
-    PulSELECT* receivedPackets; //sizeof(PulSELECT) + 0x8 = 0x76, this struct is packed (RKNet/RACEDATA.hpp)
+    PulSELECT* receivedPackets; //sizeof(PulSELECT) + 0x8 = 0x78, this struct is packed (RKNet/RACEDATA.hpp)
 
     u8 padding[0x80 - (sizeof(PulSELECT) + 0x8 + 4)];
     //Moved from 0x2f0 for 24 aids (Race/Players24/Online24Handlers.inc)

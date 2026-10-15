@@ -26,6 +26,8 @@ public:
     UIControl* CreateControl(u32 id) override; //0x88
     void SetButtonHandlers(PushButton& button) override; //80853aac 0x8C
     static inline Team GetPlayerTeam(u8 teamsArrayIdx) { return static_cast<Team>(teams[teamsArrayIdx]); }
+    //The players the page shows, in order: their index in teams[] and in the room's Mii group (also SetTeams)
+    static u32 GetEntries(u8* teamsArrayIdxs, u8* miiIdxs, u32 maxCount);
 
 private:
     void OnArrowClick(PushButton& button, u32 hudSlotId);
@@ -39,6 +41,7 @@ private:
     void SetColours(u32 idx, u8 team);
     static u8 CalcTeamsArrayIdx(u32 teamsArrayIdx);
     static u32 CalcIdx(u8 teamsArrayIdx);
+    void PlaceRow24(LayoutUIControl& control, u32 idx);
     static void RotateArrow(PushButton& button, u8 team);
     static void RotateArrowPane(PushButton& button, const char* pane, u8 team);
 
@@ -46,11 +49,14 @@ private:
     PtmfHolder_2A<TeamSelect, void, PushButton&, u32> onArrowSelectHandler;
     PtmfHolder_2A<TeamSelect, void, PushButton&, u32> onArrowDeselectHandler;
     PtmfHolder_2A<TeamSelect, void, ToggleButton&, u32> onToggleButtonClick;
-    PushButton arrows[12];
-    LayoutUIControl miis[12];
+    //12 rows, 24 when the host can open a 24 players room (Race/Players24): one per console there, teams[aid]
+    static const u32 maxRows = 24;
+    u32 rowCount;
+    PushButton arrows[maxRows];
+    LayoutUIControl miis[maxRows];
     MiiName name;
     MiiGroup* miiGroup; //take friendroom's
-    u8 arrowMiiIdx[12];
+    u8 arrowMiiIdx[maxRows];
     ToggleButton toggle;
     static const char* miiBg;
     static const char* border;

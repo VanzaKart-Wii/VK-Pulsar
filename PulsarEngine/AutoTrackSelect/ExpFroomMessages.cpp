@@ -50,9 +50,9 @@ void ExpFroomMessages::OnCourseButtonClick(PushButton& button, u32 hudSlotId) {
     Pages::FriendRoomMessages::OnModeButtonClick(clickedButton, 0);
 }
 
-//A room opened with 24 places only starts plain VS (Race/Players24/Online24.hpp): its menu has that button alone
+//A room opened with 24 places only starts VS and red/blue team VS (Race/Players24/Online24.hpp): the first two buttons
 static u32 ModeButtonCount() {
-    return Players24::IsHostingRoom24() ? 1 : 7; // 4 standard + VK WW (4) + OTT WW (5) + Item Rain WW (6)
+    return Players24::IsHostingRoom24() ? 2 : 7; // 4 standard + VK WW (4) + OTT WW (5) + Item Rain WW (6)
 }
 
 static void OnStartButtonFroomMsgActivate() {
@@ -182,8 +182,8 @@ static void RemapAndStoreSentMessage() {
     asm(mr packet, r30;);
     asm(mr manager, r28;);
     u32 message = (packet >> 8) & 0xFFFF;
-    //The host starts what its clients get: plain VS in a 24 players room (PulROOM.cpp)
-    if ((message >= 4 && message <= 9) || Players24::IsHostingRoom24()) {
+    //The host starts what its clients get: VS or team VS in a 24 players room (PulROOM.cpp)
+    if ((message >= 4 && message <= 9) || (Players24::IsHostingRoom24() && message != 1)) {
         packet = packet & 0xFF0000FF;
     }
     *(volatile u32*)((u8*)manager + 0x2c60) = packet;

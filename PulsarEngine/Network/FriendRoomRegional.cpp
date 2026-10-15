@@ -10,6 +10,7 @@
 #include <Config.hpp>
 #include <PulsarSystem.hpp>
 #include <Network/Network.hpp>
+#include <UI/ExtendedTeamSelect/ExtendedTeamManager.hpp>
 
 namespace Pulsar {
 namespace Network {
@@ -167,6 +168,7 @@ static void ApplyNextSection(SectionMgr* sectionMgr, SectionId nextSectionId, u3
 }
 
 static void SetNextSectionRegionalHook(SectionMgr* sectionMgr, SectionId nextSectionId, u32 animDirection) {
+    nextSectionId = UI::ExtendedTeamManager::SkipTeamAward(nextSectionId);
     SetRegionId();
     bool isFroom = RKNet::Controller::sInstance->roomType == RKNet::ROOMTYPE_FROOM_HOST ||
                    RKNet::Controller::sInstance->roomType == RKNet::ROOMTYPE_FROOM_NONHOST;

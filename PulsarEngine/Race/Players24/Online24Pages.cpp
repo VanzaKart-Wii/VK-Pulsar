@@ -58,6 +58,7 @@ static void SelectMiiCount(HookRegs& regs, u32) {
 typedef void (*CopyMiiFunc)(MiiGroup* group, MiiGroup* source, u32 sourceIdx, u32 destIdx);
 typedef void (*PlayerMiiFunc)(MiiGroup* group, u32 idx, u32 aid, u32 slot);
 
+typedef u8 (*GetTeamFunc)(const RKNet::SELECTHandler* handler, u8 aid, u8 hudSlotId);
 static void AddPlayersPastAid12(HookRegs& regs, u32) {
     if(selectRows <= vanillaPlayers) return;
     Pages::SELECTStageMgr* page = reinterpret_cast<Pages::SELECTStageMgr*>(regs.gpr[15]);
@@ -74,7 +75,8 @@ static void AddPlayersPastAid12(HookRegs& regs, u32) {
             PlayerInfo& info = page->infos[count];
             info.aid = aid;
             info.hudSlotid = slot;
-            info.team = team;
+            info.team = team == TEAM_NONE ? team
+                : static_cast<Team>(reinterpret_cast<GetTeamFunc>(Port(0x80660654))(RKNet::SELECTHandler::sInstance, aid, slot));
             const RKNet::USERPacket& packet = aid == localAid ? user->toSendPacket : user->receivedPackets[aid];
             info.vr = packet.vr;
             info.br = packet.br;

@@ -31,6 +31,11 @@ struct ExtendedTeamPlayer {
 
 class ExtendedTeamManager {
    public:
+    //Vanilla team VS (racedata modeFlags). Offline the extended teams replace red/blue when the "Ext. Team" setting is on
+    static const u32 TEAM_MODE_FLAG = 0x2;
+    //Every racer of an offline VS with 24 players (Race/Players24); online rooms keep 12
+    static const u32 MAX_PLAYERS = 24;
+
     enum ExtendedROOMMessageType {
         MSG_TYPE_START_RACE = 0x81,
         MSG_TYPE_UPDATE_TEAMS = 0x82,
@@ -68,7 +73,7 @@ class ExtendedTeamManager {
     }
 
     ExtendedTeamID GetPlayerTeam(u32 idx) {
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
             if (this->players[i].playerIdx == idx) {
                 return this->players[i].team;
             }
@@ -77,7 +82,7 @@ class ExtendedTeamManager {
     }
 
     ExtendedTeamID GetPlayerTeamByAID(u8 aid, u8 playerIdOnConsole) {
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
             if (this->players[i].aid == aid && this->players[i].playerIdOnConsole == playerIdOnConsole) {
                 return this->players[i].team;
             }
@@ -86,7 +91,7 @@ class ExtendedTeamManager {
     }
 
     void SetPlayerTeamByAID(u8 aid, u8 playerIdOnConsole, ExtendedTeamID team) {
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
             if (this->players[i].aid == aid && this->players[i].playerIdOnConsole == playerIdOnConsole) {
                 this->players[i].team = team;
                 break;
@@ -112,6 +117,7 @@ class ExtendedTeamManager {
     void ResetPlayers();
 
     void VotePageSync();
+    void ConfigureOfflineTeams();
 
     Status GetStatus() {
         return this->status;
@@ -134,7 +140,7 @@ class ExtendedTeamManager {
     }
 
     void SetActiveStatusForAID(u8 aid) {
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
             if (this->players[i].aid == aid) {
                 this->players[i].active = 1;
             }
@@ -142,7 +148,7 @@ class ExtendedTeamManager {
     }
 
     void SetDoneStatusForAID(u8 aid) {
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
             if (this->players[i].aid == aid) {
                 this->players[i].done = 1;
             }
@@ -153,16 +159,37 @@ class ExtendedTeamManager {
         this->status = status;
     }
 
+    //Offline VS with "Teams" chosen in the rules and the "Ext. Team" setting on (Retro Rewind's offline extended teams)
+    static bool IsOfflineActivated();
+    //Red/blue VS with more than 12 racers (Race/Players24): its team pages need 12 rows per team
+    static bool IsRedBlue24();
+    //Racers of the current race: the race scenario says 12 on the results pages of a race with 24 (Race/Players24)
+    static u32 GetRacerCount();
+    //SectionMgr::SetNextSection (Network/FriendRoomRegional.cpp): the main menu instead of a ceremony these teams can't have
+    static SectionId SkipTeamAward(SectionId nextSectionId);
+    //Racedata::InitRace of a race: whether the set will skip its ceremony, decided while the menu still says VS
+    static void DecideAwardSkip();
+    //A file of the loaded UI archives (Race.szs in a race, MenuSingle.szs in the menu): the pack's 24 copies
+    static bool HasUIFile(const char* path);
+
     static bool IsActivated() {
+        const RacedataSettings& settings = Racedata::sInstance->menusScenario.settings;
+        if (settings.gamemode == MODE_VS_RACE) return IsOfflineActivated();
         RKNet::RoomType roomType = RKNet::Controller::sInstance->roomType;
-        return System::sInstance->IsContext(PULSAR_EXTENDEDTEAMS) && (Racedata::sInstance->menusScenario.settings.gamemode == MODE_PRIVATE_VS || Racedata::sInstance->menusScenario.settings.gamemode == MODE_PRIVATE_BATTLE) && (roomType == RKNet::ROOMTYPE_FROOM_HOST || roomType == RKNet::ROOMTYPE_FROOM_NONHOST);
+        return System::sInstance->IsContext(PULSAR_EXTENDEDTEAMS) && (settings.gamemode == MODE_PRIVATE_VS || settings.gamemode == MODE_PRIVATE_BATTLE) && (roomType == RKNet::ROOMTYPE_FROOM_HOST || roomType == RKNet::ROOMTYPE_FROOM_NONHOST);
+    }
+
+    //Online room pages: the local player's own team, by aid there (offline every player has its id)
+    static bool IsOnlineRoom() {
+        const RKNet::Controller* controller = RKNet::Controller::sInstance;
+        return controller != nullptr && (controller->roomType == RKNet::ROOMTYPE_FROOM_HOST || controller->roomType == RKNet::ROOMTYPE_FROOM_NONHOST);
     }
 
    private:
     bool AreAllOtherPlayersActive(u8 localAid);
     bool AreAllOtherPlayersDone(u8 localAid);
 
-    ExtendedTeamPlayer players[12];
+    ExtendedTeamPlayer players[MAX_PLAYERS];
 
     bool isHost;
 

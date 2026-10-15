@@ -1,6 +1,13 @@
 #include <UI/ExtendedTeamSelect/ExtendedTeamManager.hpp>
+#include <UI/ExtendedTeamSelect/ExtendedTeamSelect.hpp>
+#include <Settings/Settings.hpp>
+#include <MarioKartWii/System/random.hpp>
+#include <MarioKartWii/Archive/ArchiveMgr.hpp>
+#include <Race/Players24/Players24.hpp>
 #include <MarioKartWii/UI/Page/Other/FriendRoom.hpp>
 #include <MarioKartWii/UI/Page/Other/SELECTStageMgr.hpp>
+
+extern "C" void OSReport(const char* format, ...);
 
 namespace Pulsar {
 namespace UI {
@@ -226,8 +233,8 @@ void ExtendedTeamManager::Update() {
 }
 
 void ExtendedTeamManager::VotePageSync() {
-    ExtendedTeamPlayer newPlayers[12];
-    for (int i = 0; i < 12; i++) {
+    ExtendedTeamPlayer newPlayers[MAX_PLAYERS];
+    for (int i = 0; i < MAX_PLAYERS; i++) {
         ResetTeamPlayer(newPlayers[i], i);
     }
 
@@ -264,7 +271,99 @@ void ExtendedTeamManager::VotePageSync() {
         }
     }
 
-    memcpy(this->players, newPlayers, sizeof(ExtendedTeamPlayer) * 12);
+    memcpy(this->players, newPlayers, sizeof(newPlayers));
+}
+
+bool ExtendedTeamManager::IsRedBlue24() {
+    const RacedataSettings& settings = Racedata::sInstance->racesScenario.settings;
+    const bool isVS = settings.gamemode == MODE_VS_RACE || settings.gamemode == MODE_PRIVATE_VS; //offline, 24 players rooms
+    if (!isVS || (settings.modeFlags & TEAM_MODE_FLAG) == 0) return false;
+    return Players24::IsReady() && Players24::HasExtraRacers();
+}
+
+/*
+The end of an offline set of extended teams (from Retro Rewind) or of red/blue with 24 racers goes to the main menu.
+The ceremony, VS (0x36) or teams (0x37, the team sections 0x24-0x27), crashed loading winningrun_demo with the
+extended teams (805541e4: no racer loaded, then a null pointer), and red/blue would cast its 12 winners where it has
+room for 6 (Racedata::InitAwards). Every way to the ceremony goes through SetNextSection, but by then InitAwards has
+made the menu scenario the ceremony's (gamemode 11, "mode=11" in UpdateContext's log): the choice is made at the start
+of every race instead.
+*/
+static bool skipsAward = false;
+
+void ExtendedTeamManager::DecideAwardSkip() {
+    skipsAward = IsOfflineActivated() || IsRedBlue24();
+}
+
+SectionId ExtendedTeamManager::SkipTeamAward(SectionId nextSectionId) {
+    if (nextSectionId != SECTION_VS_RACE_AWARD && nextSectionId != SECTION_AWARD_37) return nextSectionId;
+    if (!skipsAward) return nextSectionId;
+    return SECTION_MAIN_MENU_FROM_MENU;
+}
+
+u32 ExtendedTeamManager::GetRacerCount() {
+    if (Players24::IsReady() && Players24::GetRacePlayerCount() > 0) return Players24::GetRacePlayerCount();
+    return Racedata::sInstance->racesScenario.playerCount;
+}
+
+bool ExtendedTeamManager::HasUIFile(const char* path) {
+    const ArchiveMgr* archives = ArchiveMgr::sInstance;
+    const bool found = archives != nullptr && archives->GetFile(ARCHIVE_HOLDER_UI, path) != nullptr;
+    if (!found) OSReport("[VK 24P] %s missing from the UI archives: 6 rows per team\n", path);
+    return found;
+}
+
+bool ExtendedTeamManager::IsOfflineActivated() {
+    const RacedataSettings& settings = Racedata::sInstance->menusScenario.settings;
+    return settings.gamemode == MODE_VS_RACE && (settings.modeFlags & TEAM_MODE_FLAG)
+        && Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_EXTENDEDTEAMS, RADIO_EXTENDEDTEAMSENABLED) == EXTENDEDTEAMS_ENABLED;
+}
+
+/*
+Retro Rewind's offline extended teams (rr-pulsar, ExtendedTeamManager::ConfigureOfflineTeams), called after every
+Racedata::InitRace of an offline team VS. The racers are shuffled into the number of teams of the setting (24 racers
+make 12/8/6/4 per team, 12 racers 6/4/3/2) on the first race of a set, and keep their teams for the races after it;
+the team colours are shuffled on the first race too. Retro Rewind shuffles an order it never uses (the teams follow
+the player ids); here the order decides the teams.
+*/
+void ExtendedTeamManager::ConfigureOfflineTeams() {
+    const RacedataScenario& scenario = Racedata::sInstance->racesScenario;
+    const u32 playerCount = scenario.playerCount > MAX_PLAYERS ? MAX_PLAYERS : scenario.playerCount;
+    if (scenario.settings.raceNumber != 0) {
+        bool isConfigured = true; //the same racers as the teams were made for (a set restarted from the menu starts at 0)
+        for (u32 id = 0; id < playerCount; ++id) {
+            if (this->players[id].playerIdx != id) isConfigured = false;
+        }
+        if (isConfigured) return;
+    }
+
+    u32 teamCount = 2;
+    switch (Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_EXTENDEDTEAMS, SCROLLER_EXTENDEDTEAMSCOUNT)) {
+        case EXTENDEDTEAMS_COUNT_3: teamCount = 3; break;
+        case EXTENDEDTEAMS_COUNT_4: teamCount = 4; break;
+        case EXTENDEDTEAMS_COUNT_6: teamCount = 6; break;
+    }
+    if (teamCount > playerCount) teamCount = playerCount;
+
+    this->ResetPlayers();
+
+    u8 order[MAX_PLAYERS];
+    for (u32 i = 0; i < playerCount; ++i) order[i] = i;
+    Random random;
+    for (u32 i = playerCount; i > 1; --i) {
+        const u32 other = random.NextLimited(i);
+        const u8 id = order[i - 1];
+        order[i - 1] = order[other];
+        order[other] = id;
+    }
+
+    for (u32 slot = 0; slot < playerCount; ++slot) {
+        const u8 id = order[slot];
+        this->SetPlayerIndexes(id, id, 0xFF, 0xFF);
+        this->SetPlayerTeam(id, static_cast<ExtendedTeamID>(slot * teamCount / playerCount));
+    }
+
+    ExtendedTeamSelect::RandomizeTeamColors();
 }
 
 void ExtendedTeamManager::Reset() {
@@ -281,10 +380,11 @@ void ExtendedTeamManager::Reset() {
 
     this->lastUpdateTimer->isActive = false;
     this->waitingTimer->isActive = false;
+    ExtendedTeamSelect::ResetTeamColors();
 }
 
 void ExtendedTeamManager::ResetPlayers() {
-    for (int i = 0; i < 12; i++) {
+    for (int i = 0; i < MAX_PLAYERS; i++) {
         ResetTeamPlayer(this->players[i], i);
     }
 }

@@ -41,9 +41,9 @@ const PageParams Params::uiPages[Params::uiPageCount] ={
     { NAMES(4), 2, 2, //KO
         { ROW(4, SETTINGKO_ENABLED, 4, 0, 2), ROW(4, SETTINGKO_FINAL, 4, 1, 2) },
         { ROW(4, SETTINGKO_KOPERRACE, 4, 0, 4), ROW(4, SETTINGKO_RACESPERKO, 4, 1, 4) } },
-    { USERNAMES(0), 2, 0, //Extended Teams
+    { USERNAMES(0), 2, 1, //Extended Teams
         { ROW(5, RADIO_EXTENDEDTEAMSENABLED, 5, 0, 2), ROW(5, RADIO_EXTENDEDTEAMSLINE, 5, 1, 2) },
-        { } },
+        { ROW(5, SCROLLER_EXTENDEDTEAMSCOUNT, 5, 0, 4) } },
     { USERNAMES(1), 2, 1, //Misc
         { ROW(6, RADIO_PATCHES, 6, 0, 2), ROW(6, RADIO_HARDAI, 6, 1, 2) },
         { ROW(6, SCROLLER_LANGUAGE, 6, 0, 2) } },

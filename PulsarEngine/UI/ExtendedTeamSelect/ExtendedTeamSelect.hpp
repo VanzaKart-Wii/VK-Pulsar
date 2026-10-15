@@ -47,6 +47,9 @@ class ExtendedTeamSelect : public Pages::MenuInteractable {
     void UpdatePlayerTeamByAID(u8 aid, u8 playerIdOnConsole, ExtendedTeamID team);
 
     static void GetTeamColor(ExtendedTeamID team, u8& r, u8& g, u8& b);
+    static void RandomizeTeamColors();
+    static void ResetTeamColors();
+    static u32 GetTeamNameBmg(ExtendedTeamID team);
 
    private:
     PtmfHolder_1A<ExtendedTeamSelect, void, u32> onFrontPressHandler;

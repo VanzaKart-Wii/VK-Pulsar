@@ -1,6 +1,7 @@
 #include <UI/Leaderboard/ExpGPVSLeaderboardUpdate.hpp>
 #include <UI/Leaderboard/LeaderboardDisplay.hpp>
 #include <UI/ExtendedTeamSelect/ExtendedTeamManager.hpp>
+#include <UI/ExtendedTeamSelect/Result/CtrlRaceResultExtendedTeams.hpp>
 #include <Settings/Settings.hpp>
 
 namespace Pulsar {
@@ -27,12 +28,16 @@ static const int ALLOWED_PLAYER_PER_TEAM_COUNT[TEAM_COUNT + 1] = {0, 0, 6, 4, 3,
 
 PageId ExpGPVSLeaderboardUpdate::GetNextPage() const {
     PageId nextPageId = Pages::GPVSLeaderboardUpdate::GetNextPage();
+    if (nextPageId == PAGE_TEAMVS_TOTAL_LEADERBOARDS && ExtendedTeamManager::IsRedBlue24()) {
+        return static_cast<PageId>(PULPAGE_EXTENDEDTEAMS_RESULT_TOTAL);
+    }
     if (ExtendedTeamManager::IsActivated() && nextPageId == PAGE_GPVS_TOTAL_LEADERBOARDS) {
-        RacedataScenario &scenario = Racedata::sInstance->racesScenario;
+        //The real racer count: past 12 the race scenario says 12 on the results pages (Race/Players24)
+        const u32 racerCount = ExtendedTeamManager::GetRacerCount();
         int teamCount = 0;
         int numPlayerPerTeam[TEAM_COUNT] = {0};
 
-        for (int i = 0; i < scenario.playerCount; i++) {
+        for (int i = 0; i < racerCount; i++) {
             ExtendedTeamID team = ExtendedTeamManager::sInstance->GetPlayerTeam(i);
             numPlayerPerTeam[team]++;
         }
@@ -43,8 +48,11 @@ PageId ExpGPVSLeaderboardUpdate::GetNextPage() const {
             }
         }
 
+        //Two teams past 12 racers get red/blue's 24 columns (CtrlRaceResultExtendedTeams::LoadWide), 12 rows each
+        const int allowed = teamCount == 2 && racerCount > 12 && CtrlRaceResultExtendedTeams::HasWideLayouts()
+            ? CtrlRaceResultExtendedTeams::MAX_ITEMS : ALLOWED_PLAYER_PER_TEAM_COUNT[teamCount];
         for (int i = 0; i < TEAM_COUNT; i++) {
-            if (numPlayerPerTeam[i] > ALLOWED_PLAYER_PER_TEAM_COUNT[teamCount]) {
+            if (numPlayerPerTeam[i] > allowed) {
                 return static_cast<PageId>(PULPAGE_EXTENDEDTEAMS_RESULT_TOTAL_IRREGULAR);
             }
         }

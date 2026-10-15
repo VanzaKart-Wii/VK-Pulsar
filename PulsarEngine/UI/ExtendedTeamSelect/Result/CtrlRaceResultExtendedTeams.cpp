@@ -2,10 +2,21 @@
 #include <CustomCharacters/CustomCharacters.hpp>
 #include <MarioKartWii/Race/RaceInfo/RaceInfo.hpp>
 #include <MarioKartWii/GlobalFunctions.hpp>
+#include <Race/Players24/Players24.hpp>
 
 namespace Pulsar {
 namespace UI {
 
+//Red/blue: the stock column compares the racer's team in the race scenario (CtrlRaceResultTeam::InitSelf)
+bool CtrlRaceResultExtendedTeams::IsMember(u8 playerId) const {
+    if (this->isRedBlue) return Players24::GetPlayer(Racedata::sInstance->racesScenario, playerId).team == static_cast<Team>(this->teamId);
+    return ExtendedTeamManager::sInstance->GetPlayerTeam(playerId) == this->teamId;
+}
+
+/*
+Every member counts for the team's points; the rows show the best itemCount of them (all of them as long as no team
+has more members than rows, which ExpGPVSLeaderboardUpdate::GetNextPage makes sure of).
+*/
 void CtrlRaceResultExtendedTeams::InitSelf() {
     if (!Raceinfo::sInstance->IsAtLeastStage(RACESTAGE_FINISHED)) {
         return;
@@ -17,37 +28,42 @@ void CtrlRaceResultExtendedTeams::InitSelf() {
     this->currentScore = this->teamScore;
 
     int playerCount = 0;
+    CtrlRaceResultTeam::Player members[ExtendedTeamManager::MAX_PLAYERS];
 
     RacedataScenario& scenario = Racedata::sInstance->menusScenario;
-    for (int i = 0; i < scenario.playerCount; i++) {
-        if (playerCount >= 6)
-            break;
-
-        if (ExtendedTeamManager::sInstance->GetPlayerTeam(i) == this->teamId) {
-            this->players[playerCount].playerIdx = i;
-            PageId pageId = this->parentGroup->parentPage->pageId;
+    const PageId pageId = this->parentGroup->parentPage->pageId;
+    for (int i = 0; i < scenario.playerCount && i < ExtendedTeamManager::MAX_PLAYERS; i++) {
+        if (this->IsMember(i)) {
+            CtrlRaceResultTeam::Player& member = members[playerCount];
+            member.playerIdx = i;
+            member.battleScore = 0;
+            member.prevBattleScore = 0;
+            member.prevBattleScoreFloat = 0.0f;
             if (pageId == (PageId)PULPAGE_EXTENDEDTEAMS_RESULT_TOTAL) {
-                this->players[playerCount].battleScore = scenario.players[i].score;
-                this->players[playerCount].prevBattleScore = scenario.players[i].previousScore;
-                this->players[playerCount].prevBattleScoreFloat = scenario.players[i].previousScore;
+                const RacedataPlayer& player = Players24::GetPlayer(scenario, i);
+                member.battleScore = player.score;
+                member.prevBattleScore = player.previousScore;
+                member.prevBattleScoreFloat = player.previousScore;
 
-                this->currentScore += scenario.players[i].previousScore;
-                this->teamScore += scenario.players[i].score;
+                this->currentScore += player.previousScore;
+                this->teamScore += player.score;
             }
 
             playerCount++;
         }
     }
 
-    qsort(this->players, playerCount, sizeof(CtrlRaceResultTeam::Player), (int (*)(const void*, const void*))CtrlRaceResultTeam::ComparePlayers);
-    for (int i = playerCount; i < 6; i++) {
+    qsort(members, playerCount, sizeof(CtrlRaceResultTeam::Player), (int (*)(const void*, const void*))CtrlRaceResultTeam::ComparePlayers);
+    if (playerCount > (int)this->itemCount) playerCount = this->itemCount;
+    memcpy(this->players, members, sizeof(CtrlRaceResultTeam::Player) * playerCount);
+    for (int i = playerCount; i < (int)this->itemCount; i++) {
         this->players[i].playerIdx = -1;
         this->players[i].battleScore = 0;
         this->players[i].prevBattleScore = 0;
     }
 
     int rank = 0;
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < (int)this->itemCount; i++) {
         if (this->players[i].playerIdx == -1) {
             this->items[i].isHidden = true;
             continue;
@@ -58,8 +74,8 @@ void CtrlRaceResultExtendedTeams::InitSelf() {
         const u8 playerId = this->players[i].playerIdx;
 
         u8 localPlayerCount = scenario.localPlayerCount;
-        PlayerType playerType = scenario.players[playerId].playerType;
-        CharacterId characterId = scenario.players[playerId].characterId;
+        PlayerType playerType = Players24::GetPlayer(scenario, playerId).playerType;
+        CharacterId characterId = Players24::GetPlayer(scenario, playerId).characterId;
         MiiGroup& miiGroup = SectionMgr::sInstance->sectionParams->playerMiis;
 
         if (playerType == PLAYER_REAL_LOCAL) {
@@ -123,7 +139,7 @@ void CtrlRaceResultExtendedTeams::OnUpdate() {
         return;
     }
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < (int)this->itemCount; i++) {
         if (this->players[i].playerIdx != -1) {
             u32 score = this->players[i].battleScore;
             if (score - this->players[i].prevBattleScore > 0.0) {
@@ -159,30 +175,24 @@ const char* CtrlRaceResultExtendedTeams::GetClassName() const {
     return "CtrlRaceResultExpandedTeams";
 }
 
-void CtrlRaceResultExtendedTeams::Load(ExtendedTeamID teamID, int numTeams, int teamIdx) {
+//One row of the column: the extended teams recolour the red parts, red/blue hides the other team's parts as the game
+void CtrlRaceResultExtendedTeams::LoadItem(u32 i, const char* brctr, bool recolor) {
     char variant[20];
-    this->teamId = teamID;
-
-    snprintf(variant, 20, "ResultVSTeamNULL%d_%d", numTeams, teamIdx);
-
-    ControlLoader selfLoader(this);
-    selfLoader.Load("result", "ExpandedTeamResult", variant, nullptr);
-
-    this->InitControlGroup(6 + 1);
-
     const char* anims[] = {
         "Loop", "Loop", nullptr,
         "Select", "SelectOn", "SelectOff", nullptr,
         "Select2", "Select2On", "Select2Off", nullptr,
         nullptr};
 
-    for (int i = 0; i < 6; i++) {
-        snprintf(variant, 20, "BlueRed%d", i);
-        this->AddControl(i, &this->items[i]);
+    snprintf(variant, 20, "BlueRed%d", i);
+    this->AddControl(i, &this->items[i]);
 
-        ControlLoader itemLoader(&this->items[i]);
-        itemLoader.Load("result", "ResultVSTeam", variant, anims);
+    ControlLoader itemLoader(&this->items[i]);
+    itemLoader.Load("result", brctr, variant, anims);
 
+    if (!recolor) {
+        this->items[i].SetPaneVisibility(static_cast<Team>(this->teamId) == TEAM_RED ? "blue_null" : "red_null", false);
+    } else {
         this->items[i].SetPaneVisibility("blue_null", false);
 
         nw4r::lyt::Pane* teamColorPane1 = this->items[i].layout.GetPaneByName("black_parts_r_l");
@@ -200,26 +210,34 @@ void CtrlRaceResultExtendedTeams::Load(ExtendedTeamID teamID, int numTeams, int 
             teamColor1->tevColours[j].b = teamColor2->tevColours[j].b = b;
             teamColor1->tevColours[j].a = teamColor2->tevColours[j].a = 255;
         }
-
-        this->items[i].animator.GetAnimationGroupById(0).PlayAnimationAtFrame(0, 0.0f);
-        this->items[i].animator.GetAnimationGroupById(1).PlayAnimationAtFrame(1, 0.0f);
-        this->items[i].animator.GetAnimationGroupById(2).PlayAnimationAtFrame(1, 0.0f);
-
-        this->items[i].SetSoundIds(0xe1, 0xe0);
-
-        this->textInfo.intToPass[0] = 0;
-        this->items[i].SetTextBoxMessage("pts", BMG_SCORE_PTS, &this->textInfo);
     }
 
+    this->items[i].animator.GetAnimationGroupById(0).PlayAnimationAtFrame(0, 0.0f);
+    this->items[i].animator.GetAnimationGroupById(1).PlayAnimationAtFrame(1, 0.0f);
+    this->items[i].animator.GetAnimationGroupById(2).PlayAnimationAtFrame(1, 0.0f);
+
+    this->items[i].SetSoundIds(0xe1, 0xe0);
+
+    this->textInfo.intToPass[0] = 0;
+    this->items[i].SetTextBoxMessage("pts", BMG_SCORE_PTS, &this->textInfo);
+}
+
+//The team's points above the column: red/blue keeps its own colours, the extended teams recolour the red one
+void CtrlRaceResultExtendedTeams::LoadTeamPoint(const char* brctr) {
     this->resultTeamPoint = new LayoutUIControl();
-    this->AddControl(6, this->resultTeamPoint);
+    this->AddControl(this->itemCount, this->resultTeamPoint);
 
     const char* teamPointAnims[] = {
         "team", "blue", "red", nullptr,
         nullptr};
 
+    const bool isRed = !this->isRedBlue || static_cast<Team>(this->teamId) == TEAM_RED;
     ControlLoader pointLoader(this->resultTeamPoint);
-    pointLoader.Load("result", "ResultTeamPoint", "red", teamPointAnims);
+    pointLoader.Load("result", brctr, isRed ? "red" : "blue", teamPointAnims);
+    if (this->isRedBlue) {
+        this->resultTeamPoint->animator.GetAnimationGroupById(0).PlayAnimationAtFrame(isRed ? 1 : 0, 0.0f);
+        return;
+    }
     this->resultTeamPoint->animator.GetAnimationGroupById(0).isActive = false;
 
     nw4r::lyt::TextBox* pane1 = (nw4r::lyt::TextBox*)this->resultTeamPoint->layout.GetPaneByName("point");
@@ -235,8 +253,55 @@ void CtrlRaceResultExtendedTeams::Load(ExtendedTeamID teamID, int numTeams, int 
     mat1->tevColours[1].b = mat2->tevColours[1].b = b;
 }
 
+void CtrlRaceResultExtendedTeams::Load(ExtendedTeamID teamID, int numTeams, int teamIdx) {
+    char variant[20];
+    this->teamId = teamID;
+    this->itemCount = 6;
+    this->isRedBlue = false;
+
+    snprintf(variant, 20, "ResultVSTeamNULL%d_%d", numTeams, teamIdx);
+
+    ControlLoader selfLoader(this);
+    selfLoader.Load("result", "ExpandedTeamResult", variant, nullptr);
+
+    this->InitControlGroup(this->itemCount + 1);
+
+    for (u32 i = 0; i < this->itemCount; i++) this->LoadItem(i, "ResultVSTeam", true);
+
+    this->LoadTeamPoint("ResultTeamPoint");
+}
+
+bool CtrlRaceResultExtendedTeams::HasWideLayouts() {
+    return ExtendedTeamManager::HasUIFile("result/ctrl/ResultVSTeam_24.brctr")
+        && ExtendedTeamManager::HasUIFile("result/ctrl/ResultVSTeamNULL_24.brctr")
+        && ExtendedTeamManager::HasUIFile("result/ctrl/ResultTeamPoint_24.brctr");
+}
+
+/*
+Two teams past 12 racers, one of the two columns of TeamVSLeaderboardTotal (CtrlRaceResultTeam::Load) with the pack's
+24 copies: ResultVSTeamNULL_24 (the columns), ResultVSTeam_24 (BlueRed0-11, two rows of 6 per team) and
+ResultTeamPoint_24. Red/blue as the game draws it, the extended teams recoloured. A pack without them gets the stock
+files and the best 6 of each team.
+*/
+void CtrlRaceResultExtendedTeams::LoadWide(u32 column, ExtendedTeamID teamID, bool isRedBlue) {
+    char variant[20];
+    const bool has24 = HasWideLayouts();
+    this->teamId = teamID;
+    this->itemCount = has24 ? MAX_ITEMS : 6;
+    this->isRedBlue = isRedBlue;
+
+    snprintf(variant, 20, "ResultVSTeamNULL%d", column);
+    ControlLoader selfLoader(this);
+    selfLoader.Load("result", has24 ? "ResultVSTeamNULL_24" : "ResultVSTeamNULL", variant, nullptr);
+
+    this->InitControlGroup(this->itemCount + 1);
+    for (u32 i = 0; i < this->itemCount; i++) this->LoadItem(i, has24 ? "ResultVSTeam_24" : "ResultVSTeam", !isRedBlue);
+
+    this->LoadTeamPoint(has24 ? "ResultTeamPoint_24" : "ResultTeamPoint");
+}
+
 bool CtrlRaceResultExtendedTeams::IsResultAnimDone() const {
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < (int)this->itemCount; i++) {
         if ((this->players[i].playerIdx != -1) && (this->players[i].battleScore - this->players[i].prevBattleScore > 0.0)) {
             return true;
         }

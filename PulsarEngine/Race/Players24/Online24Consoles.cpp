@@ -8,6 +8,7 @@
 #include <core/rvl/RFL/RFLMiddleDB.hpp>
 #include <core/egg/mem/Heap.hpp>
 #include <Network/PacketExpansion.hpp>
+#include <MarioKartWii/System/random.hpp>
 
 extern "C" void OSReport(const char* format, ...);
 
@@ -76,6 +77,39 @@ static void AllocatePlayerIds(RKNet::SELECTHandler* handler) {
         packet.playerIdToAid[id] = table[id];
         packet.playerIdToAidExt[id] = table[vanillaPlayers + id];
     }
+}
+
+bool DecideTeams24(RKNet::SELECTHandler* handler, u32& teams) {
+    Network::PulSELECT& packet = reinterpret_cast<Network::ExpSELECTHandler*>(handler)->toSendPacket;
+    packet.teamsExt = 0;
+    if(!IsConsoles24()) return false;
+    u8 aids[maxAids];
+    u8 count = 0;
+    for(u8 aid = 0; aid < maxAids; ++aid) if(PlayersAtAid(aid) > 0) aids[count++] = aid;
+    Random random;
+    for(u8 i = count; i > 1; --i) {
+        const u8 other = random.NextLimited(i);
+        const u8 aid = aids[i - 1];
+        aids[i - 1] = aids[other];
+        aids[other] = aid;
+    }
+    for(u8 i = 0; i < count; i += 2) {
+        const u8 aid = aids[i];
+        if(aid < vanillaPlayers) teams |= 1 << (aid * 2);
+        else packet.teamsExt |= 1 << (aid - vanillaPlayers);
+    }
+    return true;
+}
+
+typedef u8 (*GetTeamFunc)(const RKNet::SELECTHandler* handler, u8 aid, u8 hudSlotId);
+static void* getTeamOriginal = nullptr;
+static u8 GetTeam24(const RKNet::SELECTHandler* handler, u8 aid, u8 hudSlotId) {
+    if(aid < vanillaPlayers || aid >= maxAids || !IsConsoles24()) {
+        return reinterpret_cast<GetTeamFunc>(getTeamOriginal)(handler, aid, hudSlotId);
+    }
+    const Network::PulSELECT& packet = reinterpret_cast<const Network::ExpSELECTHandler*>(handler)->toSendPacket;
+    if(packet.phase == 0) return TEAM_NONE;
+    return (packet.teamsExt >> (aid - vanillaPlayers)) & 1 ? TEAM_RED : TEAM_BLUE;
 }
 
 static bool hostingRoom24 = false;
@@ -183,6 +217,7 @@ static const HookPatch hooks[] ={
 };
 static const FuncHook funcs[] ={
     { 0x80658de0, 0x9421ffd0, reinterpret_cast<const void*>(UpdateSubsAndVR), &updateSubsOriginal },
+    { 0x80660654, 0x8803003d, reinterpret_cast<const void*>(GetTeam24), &getTeamOriginal },
 };
 static PatchSet consolesSet("Online 24 consoles", words, P24_COUNT(words), calls, P24_COUNT(calls), nullptr, 0, hooks,
     P24_COUNT(hooks), funcs, P24_COUNT(funcs), false, true);

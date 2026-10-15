@@ -80,7 +80,7 @@ static void CheckLayout() {
     offset_assert(CustomRKNetController, localStatusData, 0x25e4);
     offset_assert(CustomRKNetController, shutdownScheduled, 0x2755);
     offset_assert(CustomRKNetController, currentSub, 0x291c);
-    offset_assert(ExpSELECTHandler, receivedPackets, 0x76);
+    offset_assert(ExpSELECTHandler, receivedPackets, 0x78);
     offset_assert(ExpSELECTHandler, lastReceivedTimes, 0x80);
     offset_assert(ExpSELECTHandler, unknown_0x350, 0x140);
     offset_assert(ExpSELECTHandler, unknown_0x3b0, 0x200);

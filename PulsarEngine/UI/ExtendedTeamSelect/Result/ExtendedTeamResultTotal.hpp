@@ -23,6 +23,7 @@ class ExtendedTeamResultTotal : public Pages::Leaderboard {
     void FillRows() override;
 
     CtrlRaceResultExtendedTeams results[TEAM_COUNT];
+    int resultCount; //columns loaded
 };
 
 }  // namespace UI

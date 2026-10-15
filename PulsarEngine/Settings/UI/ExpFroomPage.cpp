@@ -8,6 +8,7 @@
 #include <Settings/UI/SettingsPageSelect.hpp>
 #include <UI/UI.hpp>
 #include <UI/ExtendedTeamSelect/ExtendedTeamManager.hpp>
+#include <Race/Players24/Online24.hpp>
 
 namespace Pulsar {
 namespace UI {
@@ -85,7 +86,9 @@ void ExpFroom::OnSettingsButtonClick(PushButton& button, u32 hudSlotId) {
 
 void ExpFroom::OnTeamsButtonClick(PushButton& button, u32 hudSlotId) {
     this->areControlsHidden = true;
-    if (Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_EXTENDEDTEAMS, RADIO_EXTENDEDTEAMSENABLED) == EXTENDEDTEAMS_ENABLED) {
+    //A 24 players room has red/blue only (Race/Players24/Online24.hpp): its page of 24
+    if (Settings::Mgr::Get().GetUserSettingValue(Settings::SETTINGSTYPE_EXTENDEDTEAMS, RADIO_EXTENDEDTEAMSENABLED) == EXTENDEDTEAMS_ENABLED
+        && !Players24::IsHostingRoom24()) {
         this->AddPageLayer(static_cast<PageId>(PULPAGE_EXTENDEDTEAMSELECT), 0);
     } else {
         this->AddPageLayer(static_cast<PageId>(PULPAGE_TEAMSELECT), 0);

@@ -346,7 +346,16 @@ enum UISettingHUDColor {
 
 enum ExtendedTeamsSettings {
     RADIO_EXTENDEDTEAMSENABLED = 0,
-    RADIO_EXTENDEDTEAMSLINE = 1
+    RADIO_EXTENDEDTEAMSLINE = 1,
+    SCROLLER_EXTENDEDTEAMSCOUNT = 0 + 6 //offline VS: how many teams the racers are split into
+};
+
+//Two teams is 0 so that saves from before the row start with it
+enum ExtendedTeamsCount {
+    EXTENDEDTEAMS_COUNT_2,
+    EXTENDEDTEAMS_COUNT_3,
+    EXTENDEDTEAMS_COUNT_4,
+    EXTENDEDTEAMS_COUNT_6
 };
 
 enum ExtendedTeams {

@@ -3,6 +3,8 @@
 #include <MarioKartWii/UI/Page/Other/FriendRoom.hpp>
 #include <UI/TeamSelect/TeamSelect.hpp>
 #include <UI/UI.hpp>
+#include <Race/Players24/Online24.hpp>
+#include <Network/PacketExpansion.hpp>
 
 
 namespace Pulsar {
@@ -14,9 +16,11 @@ const char* TeamSelect::border = "border";
 const char* TeamSelect::miiBg = "bg";
 
 TeamSelect::TeamSelect() {
+    //Decided when the room's section is made, before the room exists: 24 rows if the host can open one of 24
+    rowCount = Players24::CanHostRoom24() ? maxRows : 12;
     hasBackButton = true;
     externControlCount = 0;
-    internControlCount = 26;
+    internControlCount = rowCount * 2 + 2;
     extraControlNumber = 0;
     controlSources = 2;
     titleBmg = BMG_TEAM_SELECT;
@@ -77,7 +81,7 @@ void TeamSelect::BeforeEntranceAnimations() {
     this->toggle.SetMessage(bmgId);
     this->isLocked = false;
 
-    for(int idx = 0; idx < 12; ++idx) {
+    for(int idx = 0; idx < this->rowCount; ++idx) {
         this->miis[idx].animator.GetAnimationGroupById(0).PlayAnimationAtFrameAndDisable(0, 0.0f);
     }
     for(u8 teamsArrayIdx = 0; teamsArrayIdx < 24; ++teamsArrayIdx) {
@@ -93,36 +97,67 @@ void TeamSelect::BeforeEntranceAnimations() {
 
 }
 
-void TeamSelect::BeforeControlUpdate() {
+/*
+The players shown, console by console: in a 12 players room every player of aids 0-11, teams[aid + 12 * slot] and Mii
+aid * 2 + slot; in a 24 players room (one player per console) every console of aids 0-23, teams[aid] and the Mii of
+its bubble (Race/Players24/Online24Room.cpp). SetTeams reads teams[] the same way.
+*/
+u32 TeamSelect::GetEntries(u8* teamsArrayIdxs, u8* miiIdxs, u32 maxCount) {
     const RKNet::Controller* controller = RKNet::Controller::sInstance;
     const RKNet::ControllerSub* sub = &controller->subs[0];
     if(sub->connectionUserDatas[0].playersAtConsole == 0) sub = &controller->subs[1];
 
-    int idx = 0;
-    for(int aid = 0; aid < 12; ++aid) {
+    u32 count = 0;
+    if(Players24::IsHostingRoom24()) {
+        for(u8 aid = 0; aid < maxRows && count < maxCount; ++aid) {
+            if(Players24::PlayersAtAid(aid) == 0) continue;
+            teamsArrayIdxs[count] = aid;
+            miiIdxs[count] = Players24::RoomMiiOfAid(aid);
+            ++count;
+        }
+        return count;
+    }
+    for(u8 aid = 0; aid < 12; ++aid) {
         if(sub->availableAids & (1 << aid)) {
-            for(int player = 0; player < sub->connectionUserDatas[aid].playersAtConsole; ++player) {
-                LayoutUIControl& mii = this->miis[idx];
-                mii.SetMiiPane("chara", *this->miiGroup, aid * 2 + player, 2);
-                mii.SetMiiPane("chara_shadow", *this->miiGroup, aid * 2 + player, 2);
-                mii.isHidden = false;
-                mii.animator.GetAnimationGroupById(0).PlayAnimationAtFrameAndDisable(!this->teams[aid + 12 * player], 0.0f);
-                this->arrowMiiIdx[idx] = aid * 2 + player;
-                this->SetColours(idx, this->teams[aid + 12 * player]);
-                this->RotateArrow(this->arrows[idx], this->teams[aid + 12 * player]);
-
-                PushButton& arrow = this->arrows[idx];
-                arrow.isHidden = false;
-                arrow.manipulator.inaccessible = false;
-                if(arrow.IsSelected()) {
-                    this->text.miis[0] = this->miiGroup->GetMii(this->arrowMiiIdx[arrow.buttonId]);
-                    this->name.SetMessage(BMG_MII_NAME, &this->text);
-                }
-                ++idx;
+            for(u8 player = 0; player < sub->connectionUserDatas[aid].playersAtConsole && count < maxCount; ++player) {
+                teamsArrayIdxs[count] = aid + 12 * player;
+                miiIdxs[count] = aid * 2 + player;
+                ++count;
             }
         }
     }
-    for(int remIdx = idx; remIdx < 12; ++remIdx) {
+    return count;
+}
+
+void TeamSelect::BeforeControlUpdate() {
+    u8 teamsArrayIdxs[maxRows];
+    u8 miiIdxs[maxRows];
+    const u32 count = GetEntries(teamsArrayIdxs, miiIdxs, this->rowCount);
+
+    int idx = 0;
+    for(; idx < count; ++idx) {
+        const u8 team = this->teams[teamsArrayIdxs[idx]];
+        LayoutUIControl& mii = this->miis[idx];
+        const bool hasMii = this->miiGroup->GetMii(miiIdxs[idx]) != nullptr;
+        if(hasMii) {
+            mii.SetMiiPane("chara", *this->miiGroup, miiIdxs[idx], 2);
+            mii.SetMiiPane("chara_shadow", *this->miiGroup, miiIdxs[idx], 2);
+        }
+        mii.isHidden = !hasMii;
+        mii.animator.GetAnimationGroupById(0).PlayAnimationAtFrameAndDisable(!team, 0.0f);
+        this->arrowMiiIdx[idx] = miiIdxs[idx];
+        this->SetColours(idx, team);
+        this->RotateArrow(this->arrows[idx], team);
+
+        PushButton& arrow = this->arrows[idx];
+        arrow.isHidden = false;
+        arrow.manipulator.inaccessible = false;
+        if(arrow.IsSelected() && hasMii) {
+            this->text.miis[0] = this->miiGroup->GetMii(this->arrowMiiIdx[arrow.buttonId]);
+            this->name.SetMessage(BMG_MII_NAME, &this->text);
+        }
+    }
+    for(int remIdx = idx; remIdx < this->rowCount; ++remIdx) {
 
         this->miis[remIdx].isHidden = true;
         this->arrows[remIdx].isHidden = true;
@@ -130,31 +165,57 @@ void TeamSelect::BeforeControlUpdate() {
     }
 }
 
+/*
+24 rows: four columns of 6, from the row variants of the first column (Arrow0-5, Mii0-5 at x -200, a row every 54
+from y 140) moved and scaled to 0.62, like the 24 players results (Race/Players24/ResultsPorts.cpp). The rows end
+above the name and the toggle (y -125 and -165). The control's four transforms at +4, the third being the
+animation's delta, which stays.
+*/
+void TeamSelect::PlaceRow24(LayoutUIControl& control, u32 idx) {
+    static const float columnX[4] ={ -315.0f, -105.0f, 105.0f, 315.0f };
+    const float scale = 0.62f;
+    const float x = columnX[idx / 6];
+    const float y = 150.0f - 44.0f * (idx % 6);
+    PositionAndScale* transforms = control.positionAndscale;
+    const float baseX = transforms[0].position.x;
+    const float baseY = transforms[0].position.y;
+    for(int i = 0; i < 4; ++i) {
+        if(i == 2) continue;
+        transforms[i].position.x = x + (transforms[i].position.x - baseX) * scale;
+        transforms[i].position.y = y + (transforms[i].position.y - baseY) * scale;
+        transforms[i].scale.x *= scale;
+        transforms[i].scale.z *= scale; //Vec2 is x, z
+    }
+}
+
 UIControl* TeamSelect::CreateControl(u32 id) {
-    if(id > 26) return nullptr;
+    if(id >= this->internControlCount) return nullptr;
     const u32 count = this->controlCount;
     this->controlCount++;
     char variant[0x40];
-    if(id < 12) {
+    const bool is24 = this->rowCount > 12;
+    if(id < this->rowCount) {
         this->AddControl(count, this->arrows[id], 0);
-        snprintf(variant, 0x40, "Arrow%d", id);
+        snprintf(variant, 0x40, "Arrow%d", is24 ? id % 6 : id);
         this->arrows[id].Load(UI::buttonFolder, "TeamArrow", variant, 1, 0, false);
+        if(is24) this->PlaceRow24(this->arrows[id], id);
         this->arrows[id].buttonId = id;
         this->arrows[id].SetOnClickHandler(this->onArrowClickHandler, 0);
         this->arrows[id].SetOnSelectHandler(this->onArrowSelectHandler);
         return &this->arrows[id];
     }
-    else if(id < 24) {
-        id = id - 12;
+    else if(id < this->rowCount * 2) {
+        id = id - this->rowCount;
         this->AddControl(count, this->miis[id], 0);
         ControlLoader loader(&this->miis[id]);
-        snprintf(variant, 0x40, "Mii%d", id);
+        snprintf(variant, 0x40, "Mii%d", is24 ? id % 6 : id);
         const char* brctr = "TeamMii";
         static const char* miiAnim[5] ={ "Translate", "TranslateRight", "TranslateLeft", nullptr, nullptr };
         loader.Load(UI::controlFolder, brctr, variant, miiAnim);
+        if(is24) this->PlaceRow24(this->miis[id], id);
         return &this->miis[id];
     }
-    else if(id == 24) {
+    else if(id == this->rowCount * 2) {
         this->AddControl(count, this->name, 0);
         ControlLoader loader(&this->name);
         const char* brctr = "TeamName";
@@ -183,7 +244,9 @@ void TeamSelect::OnArrowClick(PushButton& button, u32 hudSlotId) {
 }
 
 void TeamSelect::OnArrowSelect(PushButton& button, u32 hudSlotId) {
-    this->text.miis[0] = this->miiGroup->GetMii(this->arrowMiiIdx[button.buttonId]);
+    Mii* mii = this->miiGroup->GetMii(this->arrowMiiIdx[button.buttonId]);
+    if(mii == nullptr) return; //a console of a 24 players room whose Mii isn't there
+    this->text.miis[0] = mii;
     this->name.SetMessage(BMG_MII_NAME, &this->text);
 }
 
@@ -224,39 +287,18 @@ void TeamSelect::OnButtonClick(PushButton& button, u32 hudSlotId) {
 }
 
 u8 TeamSelect::CalcTeamsArrayIdx(u32 idx) {
-    const RKNet::Controller* controller = RKNet::Controller::sInstance;
-    const RKNet::ControllerSub* sub = &controller->subs[0];
-    if(sub->connectionUserDatas[0].playersAtConsole == 0) sub = &controller->subs[1];
-
-    u32 curIdx = 0;
-    for(u8 curAid = 0; curAid < 12; ++curAid) {
-        if(sub->availableAids & (1 << curAid)) {
-            for(int player = 0; player < sub->connectionUserDatas[curAid].playersAtConsole; ++player) {
-                if(curIdx == idx) return curAid + 12 * player;
-                ++curIdx;
-            }
-        }
-    }
-    return 0xFF;
+    u8 teamsArrayIdxs[maxRows];
+    u8 miiIdxs[maxRows];
+    const u32 count = GetEntries(teamsArrayIdxs, miiIdxs, maxRows);
+    return idx < count ? teamsArrayIdxs[idx] : 0xFF;
 }
 
 u32 TeamSelect::CalcIdx(u8 teamsArrayIdx) {
-    const RKNet::Controller* controller = RKNet::Controller::sInstance;
-    const RKNet::ControllerSub* sub = &controller->subs[0];
-    if(sub->connectionUserDatas[0].playersAtConsole == 0) sub = &controller->subs[1];
-
-    bool isGuest = teamsArrayIdx >= 12;
-    u8 aid = isGuest ? teamsArrayIdx - 12 : teamsArrayIdx;
-    if(!(sub->availableAids & (1 << aid)) || isGuest && sub->connectionUserDatas[aid].playersAtConsole < 2) return 0xFF;
-
-    //the aid is valid, therefore it has an idx
-    u32 idx = 0;
-    for(u8 curAid = 0; curAid < aid; ++curAid) {
-        if(sub->availableAids & (1 << curAid)) {
-            for(int player = 0; player < sub->connectionUserDatas[curAid].playersAtConsole; ++player) ++idx;
-        }
-    }
-    return isGuest ? idx + 1 : idx;
+    u8 teamsArrayIdxs[maxRows];
+    u8 miiIdxs[maxRows];
+    const u32 count = GetEntries(teamsArrayIdxs, miiIdxs, maxRows);
+    for(u32 idx = 0; idx < count; ++idx) if(teamsArrayIdxs[idx] == teamsArrayIdx) return idx;
+    return 0xFF;
 }
 
 void TeamSelect::RotateArrow(PushButton& button, u8 team) {
@@ -323,6 +365,31 @@ void TeamSelect::SetColours(u32 idx, u8 team) {
 
 //Sets Team using the TeamSelectPage if it has been enabled by the host; verifies the validity of the teams
 static void SetTeams(RKNet::SELECTHandler* handler, u32& teams) {
+    //24 players room: every console, aids 0-23 in teams[aid]; aids 12-23 go in the packet's extension
+    if(Players24::IsConsoles24()) {
+        u32 teamsExt = 0;
+        bool isValid = false;
+        if(handler->mode == RKNet::ONLINEMODE_PRIVATE_VS && UI::TeamSelect::isEnabled) {
+            u8 teamsArrayIdxs[24];
+            u8 miiIdxs[24];
+            const u32 count = UI::TeamSelect::GetEntries(teamsArrayIdxs, miiIdxs, 24);
+            for(u32 i = 0; i < count; ++i) {
+                const u8 aid = teamsArrayIdxs[i];
+                const u32 team = UI::TeamSelect::GetPlayerTeam(aid) & 1; //1 red (SetColours), a set bit for GetTeam
+                if(team != (UI::TeamSelect::GetPlayerTeam(teamsArrayIdxs[0]) & 1)) isValid = true;
+                if(aid < 12) teams |= team << (aid * 2);
+                else teamsExt |= team << (aid - 12);
+            }
+        }
+        if(!isValid) {
+            teams = 0;
+            Players24::DecideTeams24(handler, teams); //everyone in one team, or the page off: drawn
+            return;
+        }
+        reinterpret_cast<Network::ExpSELECTHandler*>(handler)->toSendPacket.teamsExt = teamsExt;
+        return;
+    }
+    Players24::DecideTeams24(handler, teams); //outside them: only empties the extension
     const RKNet::Controller* controller = RKNet::Controller::sInstance;
     const RKNet::ControllerSub* sub = &controller->subs[0];
     if(sub->connectionUserDatas[0].playersAtConsole == 0) sub = &controller->subs[1];

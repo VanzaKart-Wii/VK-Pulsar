@@ -75,6 +75,7 @@ void ExpSection::CreatePulPages() {
                 this->CreateAndInitPage(*this, PULPAGE_EXTENDEDTEAMS_RESULT_TOTAL);
                 this->CreateAndInitPage(*this, PULPAGE_EXTENDEDTEAMS_RESULT_TOTAL_IRREGULAR);
             }
+            else if(ExtendedTeamManager::IsRedBlue24()) this->CreateAndInitPage(*this, PULPAGE_EXTENDEDTEAMS_RESULT_TOTAL); //12 per team
             break;
             case SECTION_P1_WIFI_FROOM_VS_VOTING:      //0x60
         case SECTION_P1_WIFI_FROOM_TEAMVS_VOTING:  //0x61
@@ -110,6 +111,7 @@ void ExpSection::CreatePulPages() {
                 this->CreateAndInitPage(*this, PULPAGE_EXTENDEDTEAMS_RESULT_TOTAL);
                 this->CreateAndInitPage(*this, PULPAGE_EXTENDEDTEAMS_RESULT_TOTAL_IRREGULAR);
             }
+            else if(ExtendedTeamManager::IsRedBlue24()) this->CreateAndInitPage(*this, PULPAGE_EXTENDEDTEAMS_RESULT_TOTAL); //12 per team
             break;
         case SECTION_P1_WIFI_FRIEND_BALLOON:  //0x72
         case SECTION_P1_WIFI_FRIEND_COIN:     //0x73

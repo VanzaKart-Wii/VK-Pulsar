@@ -355,7 +355,8 @@ static void MenuDataSetup(void* r3, void* r4, void* r5, void* r6) {
             player.prevFinishPos = static_cast<u8>(data->prevRaceRank);
             player.previousScore = data->sumPoints;
         }
-        player.team = GetPlayer(menu, 0).team;
+        const Team noTeam = GetPlayer(menu, 0).team;
+        player.team = noTeam == TEAM_NONE ? noTeam : static_cast<Team>(SelectGet(0x80660654, aid, slot));
         player.rating.points = 5000;
     }
     for(u8 id = humanCount; id < maxPlayers; ++id) {

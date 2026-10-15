@@ -1,4 +1,5 @@
 #include <UI/ExtendedTeamSelect/Result/ExtendedTeamResultIrregularTotal.hpp>
+#include <Race/Players24/Players24.hpp>
 
 namespace Pulsar {
 namespace UI {
@@ -66,7 +67,7 @@ void ExtendedTeamResultIrregularTotal::FillRows() {
             scores[team].present = true;
         }
 
-        scores[team].score += menuScenario.players[i].score;
+        scores[team].score += Players24::GetPlayer(menuScenario, i).score;
     }
 
     qsort(scores, TEAM_COUNT, sizeof(TeamScore), sort_by_score);
@@ -78,15 +79,16 @@ void ExtendedTeamResultIrregularTotal::FillRows() {
     RKNet::Controller* controller = RKNet::Controller::sInstance;
     ExtendedTeamID selfTeams[2] = {TEAM_COUNT, TEAM_COUNT};
     for (int i = 0; i < menuScenario.playerCount; i++) {
-        if (menuScenario.players[i].playerType == PLAYER_REAL_LOCAL && menuScenario.players[i].hudSlotId == 0) {
+        const RacedataPlayer& player = Players24::GetPlayer(menuScenario, i);
+        if (player.playerType == PLAYER_REAL_LOCAL && player.hudSlotId == 0) {
             selfTeams[0] = ExtendedTeamManager::sInstance->GetPlayerTeam(i);
-            if (controller) {
+            if (ExtendedTeamManager::IsOnlineRoom()) {
                 RKNet::ControllerSub& currentSub = controller->subs[controller->currentSub];
                 selfTeams[0] = ExtendedTeamManager::sInstance->GetPlayerTeamByAID(currentSub.localAid, 0);
             }
-        } else if (menuScenario.players[i].playerType == PLAYER_REAL_LOCAL && menuScenario.players[i].hudSlotId == 1) {
+        } else if (player.playerType == PLAYER_REAL_LOCAL && player.hudSlotId == 1) {
             selfTeams[1] = ExtendedTeamManager::sInstance->GetPlayerTeam(i);
-            if (controller) {
+            if (ExtendedTeamManager::IsOnlineRoom()) {
                 RKNet::ControllerSub& currentSub = controller->subs[controller->currentSub];
                 selfTeams[1] = ExtendedTeamManager::sInstance->GetPlayerTeamByAID(currentSub.localAid, 1);
             }
@@ -113,7 +115,7 @@ void ExtendedTeamResultIrregularTotal::FillRows() {
         this->results[i]->SetPaneVisibility("chara_icon", false);
         this->results[i]->SetPaneVisibility("chara_icon_sha", false);
 
-        this->results[i]->SetTextBoxMessage("player_name", BMG_EXTENDEDTEAMS_TEAM_NAME + scores[i].team, nullptr);
+        this->results[i]->SetTextBoxMessage("player_name", ExtendedTeamSelect::GetTeamNameBmg(scores[i].team), nullptr);
 
         pane->flag |= 1;
 

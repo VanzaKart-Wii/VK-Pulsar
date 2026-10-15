@@ -266,7 +266,7 @@ static void UpdateRacePositions(u8* raceMode) {
 static bool Uses24Scoring(const RacedataScenario& menu) {
     if(!IsReady() || !HasExtraRacers()) return false;
     const RacedataSettings& settings = menu.settings;
-    return IsVSMode(settings.gamemode) && settings.gametype == 0 && (settings.modeFlags & 2) == 0;
+    return IsVSMode(settings.gamemode) && settings.gametype == 0;
 }
 
 static void ComputeOverallRanks(RacedataScenario& menu) {

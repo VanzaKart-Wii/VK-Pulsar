@@ -19,13 +19,25 @@ PageId ExtendedTeamResultTotal::GetNextPage() const {
 void ExtendedTeamResultTotal::OnInit() {
     RacedataScenario& scenario = Racedata::sInstance->racesScenario;
 
+    //Red/blue past 12 racers: the two stock columns with 12 rows each (TeamVSLeaderboardTotal can only show 6)
+    if (ExtendedTeamManager::IsRedBlue24()) {
+        this->resultCount = 2;
+        this->InitControlGroup(this->resultCount);
+        for (int i = 0; i < this->resultCount; i++) {
+            this->AddControl(i, this->results[i], 0);
+            this->results[i].LoadWide(i, static_cast<ExtendedTeamID>(i), true);
+        }
+        return;
+    }
+
     int teamCount = 0;
     bool teamPresent[TEAM_COUNT];
     for (int i = 0; i < TEAM_COUNT; i++) {
         teamPresent[i] = false;
     }
 
-    for (int i = 0; i < scenario.playerCount; i++) {
+    const u32 racerCount = ExtendedTeamManager::GetRacerCount();
+    for (int i = 0; i < racerCount; i++) {
         ExtendedTeamID team = ExtendedTeamManager::sInstance->GetPlayerTeam(i);
         if (!teamPresent[team]) {
             teamCount++;
@@ -40,14 +52,17 @@ void ExtendedTeamResultTotal::OnInit() {
             continue;
 
         this->AddControl(controlLoadedCount, this->results[controlLoadedCount], 0);
-        results[controlLoadedCount].Load((ExtendedTeamID)i, teamCount, controlLoadedCount);
+        //Two teams of up to 12 (ExpGPVSLeaderboardUpdate::GetNextPage): red/blue's 24 columns, recoloured
+        if (teamCount == 2 && racerCount > 12) results[controlLoadedCount].LoadWide(controlLoadedCount, (ExtendedTeamID)i, false);
+        else results[controlLoadedCount].Load((ExtendedTeamID)i, teamCount, controlLoadedCount);
 
         controlLoadedCount++;
     }
+    this->resultCount = controlLoadedCount;
 }
 
 bool ExtendedTeamResultTotal::CanEnd() {
-    for (int i = 0; i < TEAM_COUNT; i++) {
+    for (int i = 0; i < this->resultCount; i++) {
         if (this->results[i].IsResultAnimDone()) {
             return true;
         }

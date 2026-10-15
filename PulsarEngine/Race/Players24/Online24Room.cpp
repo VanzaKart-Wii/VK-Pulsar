@@ -46,6 +46,7 @@ static u8 AidOfBubble(u8 bubble) {
 }
 
 static u8 BubbleOfAid(u8 aid) { return FindBubble(aid, 0); }
+u8 RoomMiiOfAid(u8 aid) { return BubbleOfAid(aid); }
 
 static void ResetBubbles(HookRegs&, u32) {
     for(u8 bubble = 0; bubble < bubbleCount; ++bubble) {

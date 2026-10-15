@@ -15,12 +15,55 @@
 #include <MarioKartWii/Race/RaceInfo/RaceInfo.hpp>
 #include <Network/Rating/StaffBadge.hpp>
 #include <Race/Players24/Online24.hpp>
+#include <Race/Players24/Players24.hpp>
+#include <runtimeWrite.hpp>
 
 
 namespace Pulsar {
 namespace UI {
 
 static const u32 ALL_CUSTOM_ITEMS = 0x7FFFF;
+
+using Players24::GetPlayer;
+
+/*
+Offline extended teams, from Retro Rewind (rr-pulsar ExtendedTeamSelectMisc.cpp). An offline VS with "Teams" in the
+rules and the "Ext. Team" setting on is played as extended teams: every Racedata::InitRace splits the racers into
+teams (ConfigureOfflineTeams) and takes the red/blue flag out of the race scenario, so the race is a normal VS; the
+menu scenario keeps it, which is what IsActivated reads. The red/blue team page is skipped, and the set ends on the
+main menu instead of the award ceremony (ExtendedTeamManager::SkipTeamAward).
+*/
+void Racedata_InitRace(Racedata* racedata) {
+    racedata->InitRace();
+    if (ExtendedTeamManager::IsOfflineActivated()) {
+        ExtendedTeamManager::sInstance->ConfigureOfflineTeams();
+        racedata->racesScenario.settings.modeFlags &= ~ExtendedTeamManager::TEAM_MODE_FLAG;
+    }
+}
+kmCall(0x80530878, Racedata_InitRace); //Racedata::InitAwards
+kmCall(0x80530ef4, Racedata_InitRace);
+
+//The race scene's two: the end of the set will skip the ceremony or not (ExtendedTeamManager::SkipTeamAward)
+void Racedata_InitRaceScene(Racedata* racedata) {
+    Racedata_InitRace(racedata);
+    ExtendedTeamManager::DecideAwardSkip();
+}
+kmCall(0x80553c90, Racedata_InitRaceScene);
+kmCall(0x80554ab0, Racedata_InitRaceScene);
+
+kmRuntimeUse(0x8084ffc8); //VSTeamsView::AssignTeams
+void VSTeamsView_AssignTeams(Pages::Menu* _this) {
+    if (!ExtendedTeamManager::IsOfflineActivated()) {
+        reinterpret_cast<void (*)(Pages::Menu*)>(kmRuntimeAddr(0x8084ffc8))(_this);
+    }
+}
+kmCall(0x8083e528, VSTeamsView_AssignTeams);
+
+void CharacterSelect_LoadNextPage(Pages::Menu* _this, PageId pageId, float delay) {
+    if (pageId == PAGE_VS_TEAMS_VIEW && ExtendedTeamManager::IsOfflineActivated()) pageId = PAGE_KART_SELECT;
+    _this->LoadNextPageWithDelayById(pageId, delay);
+}
+kmCall(0x8083e54c, CharacterSelect_LoadNextPage);
 
 void PrepareOnlinePages(Pages::FriendRoomWaiting* _this) {
     _this->StartRoom();
@@ -141,15 +184,16 @@ void CtrlRace2DMapCharacter_CalcTransform(CtrlRace2DMapCharacter* _this, const V
     if (ExtendedTeamManager::IsActivated()) {
         ExtendedTeamID selfTeams[2] = {TEAM_COUNT, TEAM_COUNT};
         for (int i = 0; i < menuScenario.playerCount; i++) {
-            if (menuScenario.players[i].playerType == PLAYER_REAL_LOCAL && menuScenario.players[i].hudSlotId == 0) {
+            const RacedataPlayer& player = GetPlayer(menuScenario, i);
+            if (player.playerType == PLAYER_REAL_LOCAL && player.hudSlotId == 0) {
                 selfTeams[0] = ExtendedTeamManager::sInstance->GetPlayerTeam(i);
-                if (controller) {
+                if (ExtendedTeamManager::IsOnlineRoom()) {
                     RKNet::ControllerSub& currentSub = controller->subs[controller->currentSub];
                     selfTeams[0] = ExtendedTeamManager::sInstance->GetPlayerTeamByAID(currentSub.localAid, 0);
                 }
-            } else if (menuScenario.players[i].playerType == PLAYER_REAL_LOCAL && menuScenario.players[i].hudSlotId == 1) {
+            } else if (player.playerType == PLAYER_REAL_LOCAL && player.hudSlotId == 1) {
                 selfTeams[1] = ExtendedTeamManager::sInstance->GetPlayerTeam(i);
-                if (controller) {
+                if (ExtendedTeamManager::IsOnlineRoom()) {
                     RKNet::ControllerSub& currentSub = controller->subs[controller->currentSub];
                     selfTeams[1] = ExtendedTeamManager::sInstance->GetPlayerTeamByAID(currentSub.localAid, 1);
                 }
@@ -284,7 +328,7 @@ void GPVSLeaderboardUpdate_hookSetupEntries(Pages::GPVSLeaderboardUpdate* _this)
 
             nw4r::lyt::Material* mat;
             nw4r::lyt::Pane* pane;
-            if (Racedata::sInstance->racesScenario.players[playerId].playerType == PLAYER_REAL_LOCAL) {
+            if (GetPlayer(Racedata::sInstance->racesScenario, playerId).playerType == PLAYER_REAL_LOCAL) {
                 pane = result->layout.GetPaneByName("select_base");
                 mat = pane->GetMaterial();
                 pane->alpha = 255;
@@ -428,7 +472,7 @@ void WiFiVSResults_setCongratulationText(Pages::WiFiVSResults* _this) {
         qsort(scores, TEAM_COUNT, sizeof(TeamScore), sort_by_score);
 
         Text::Info info;
-        info.bmgToPass[0] = BMG_EXTENDEDTEAMS_TEAM_NAME + scores[0].team;
+        info.bmgToPass[0] = ExtendedTeamSelect::GetTeamNameBmg(scores[0].team);
 
         _this->congratulations.SetMessage(BMG_EXTENDEDTEAMS_WINNER + (scores[0].score == scores[1].score), &info);
     }

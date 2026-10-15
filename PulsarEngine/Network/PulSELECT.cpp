@@ -129,7 +129,10 @@ static void AfterSELECTReception(PulSELECT* unused, PulSELECT* src, u32 len) {
 
     memcpy(&dest, src, sizeof(PulSELECT));
     //Sent without ids 12-23 (not a 24 players room): the buffer may still hold an older packet's
-    if (holder == nullptr || holder->packetSize < sizeof(PulSELECT)) memset(dest.playerIdToAidExt, 0xFF, sizeof(dest.playerIdToAidExt));
+    if (holder == nullptr || holder->packetSize < sizeof(PulSELECT)) {
+        memset(dest.playerIdToAidExt, 0xFF, sizeof(dest.playerIdToAidExt));
+        dest.teamsExt = 0;
+    }
 }
 kmCall(0x80661130, AfterSELECTReception);
 
@@ -614,8 +617,10 @@ void ProcessNewPacketVoting() {
 
             if (myPhase == 0) { //check that every aid has the correct settings
                 const u32 battleType = send.battleTypeAndTeams;
+                //24 consoles: the teams of aids 12-23 too (only sent there)
+                const bool sameTeamsExt = !Players24::IsOnline24() || send.teamsExt == curRecv.teamsExt;
                 if (battleType != 0) {
-                    if (battleType == curRecv.battleTypeAndTeams) {
+                    if (battleType == curRecv.battleTypeAndTeams && sameTeamsExt) {
                         if (send.selectId == curRecv.selectId) {
                             if (send.engineClass == curRecv.engineClass) {
                                 handler->aidsWithAccurateRaceSettings |= aidBit;
@@ -654,6 +659,7 @@ void ProcessNewPacketVoting() {
         else if (hostAid == aid) { //I'm not the host and the loop is at the hostAid
             if (myPhase == 0) { //Copy the settings
                 send.battleTypeAndTeams = curRecv.battleTypeAndTeams;
+                send.teamsExt = curRecv.teamsExt;
                 send.selectId = curRecv.selectId;
                 send.engineClass = curRecv.engineClass;
                 if (curRecv.phase != 0) send.phase = 1;

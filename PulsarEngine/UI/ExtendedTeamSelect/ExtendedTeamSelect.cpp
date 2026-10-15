@@ -4,6 +4,7 @@
 #include <MarioKartWii/RKNet/RKNetController.hpp>
 #include <Network/GPReport.hpp>
 #include <core/nw4r/ut/Misc.hpp>
+#include <MarioKartWii/System/random.hpp>
 
 namespace Pulsar {
 namespace UI {
@@ -400,15 +401,44 @@ static const InternalTeamColor TEAM_COLORS[TEAM_COUNT] = {
 
     }};
 
+//The colour each team shows in an offline set, shuffled on its first race (ConfigureOfflineTeams); the rooms keep the
+//order, so that every console shows the same colours
+static ExtendedTeamID teamColors[TEAM_COUNT] = {TEAM_RED, TEAM_ORANGE, TEAM_YELLOW, TEAM_GREEN, TEAM_BLUE, TEAM_PURPLE};
+
+static ExtendedTeamID GetShownColor(ExtendedTeamID team) {
+    return ExtendedTeamManager::IsOfflineActivated() ? teamColors[team] : team;
+}
+
+void ExtendedTeamSelect::ResetTeamColors() {
+    for (u32 i = 0; i < TEAM_COUNT; ++i) teamColors[i] = static_cast<ExtendedTeamID>(i);
+}
+
+void ExtendedTeamSelect::RandomizeTeamColors() {
+    ResetTeamColors();
+    Random random;
+    for (u32 i = TEAM_COUNT; i > 1; --i) {
+        const u32 other = random.NextLimited(i);
+        const ExtendedTeamID color = teamColors[i - 1];
+        teamColors[i - 1] = teamColors[other];
+        teamColors[other] = color;
+    }
+}
+
+//The team names are colour names ("Team Red"), so they follow the colour
+u32 ExtendedTeamSelect::GetTeamNameBmg(ExtendedTeamID team) {
+    return BMG_EXTENDEDTEAMS_TEAM_NAME + (team < TEAM_COUNT ? GetShownColor(team) : team);
+}
+
 void ExtendedTeamSelect::GetTeamColor(ExtendedTeamID team, u8& r, u8& g, u8& b) {
     if (team >= TEAM_COUNT) {
         r = 0;
         g = 0;
         b = 0;
     } else {
-        r = TEAM_COLORS[team].color[0];
-        g = TEAM_COLORS[team].color[1];
-        b = TEAM_COLORS[team].color[2];
+        const ExtendedTeamID color = GetShownColor(team);
+        r = TEAM_COLORS[color].color[0];
+        g = TEAM_COLORS[color].color[1];
+        b = TEAM_COLORS[color].color[2];
     }
 }
 

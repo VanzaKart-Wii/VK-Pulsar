@@ -79,14 +79,15 @@ static void BeforeROOMSend(RKNet::PacketHolder<PulROOM>* packetHolder, PulROOM* 
         // Save original message before remapping.
         // Messages 4 and 5 are OPT WW and OTT WW starts (added by ExpFroomMessages).
         // Remap them to 0 or 1 so the base game handles them as a normal VS / Team VS start.
-        //A room opened with 24 places is a plain VS of 24 players until it closes, whatever the host has set since:
-        //no mogi, battle, team VS or worldwide start, and no KO, OTT or extended teams (Race/Players24/Online24.hpp)
+        //A room opened with 24 places is a VS or red/blue team VS of 24 players until it closes, whatever the host has
+        //set since: no mogi, battle or worldwide start, and no KO, OTT or extended teams (Race/Players24/Online24.hpp)
         const bool isRoom24 = Players24::IsHostingRoom24();
-        const u8 originalMessage = isRoom24 ? 0 : destPacket->message;
+        const bool isTeamVS24 = isRoom24 && destPacket->message == 1;
+        const u8 originalMessage = isRoom24 ? isTeamVS24 : destPacket->message;
         const Settings::Mgr& settings = Settings::Mgr::Get();
         const bool isStartMogi = !isRoom24 && settings.GetSettingValue(Settings::SETTINGSTYPE_HOST, SETTINGHOST_RADIO_MOGI) == 1;
 
-        if (isStartMogi || isRoom24) {
+        if (isStartMogi || (isRoom24 && !isTeamVS24)) {
             destPacket->message = 0; // Force Solo VS
         } else if (originalMessage >= 4 && originalMessage <= 6) {
             destPacket->message = 0; // VS
