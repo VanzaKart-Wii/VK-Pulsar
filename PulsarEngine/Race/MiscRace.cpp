@@ -7,6 +7,7 @@
 #include <Settings/Settings.hpp>
 #include <Race/Players24/Players24.hpp>
 #include <Race/Players24/Online24.hpp>
+#include <UI/GhostTags.hpp>
 
 namespace Pulsar {
 namespace Race {
@@ -90,6 +91,7 @@ static void BattleGlitchEnable() {
         if ((newInputs & toggleInput) == toggleInput) system->ottMgr.hideNames = !system->ottMgr.hideNames;
         if (system->ottMgr.hideNames) maxDistance -= maxDistance;
     }
+    if (Pulsar::UI::AreGhostTagsHidden()) maxDistance = 0.0f;
     RaceBalloons::maxDistanceNames = maxDistance;
 }
 RaceFrameHook BattleGlitch(BattleGlitchEnable);

@@ -17,6 +17,7 @@
 #include <Race/Players24/Online24.hpp>
 #include <Race/Players24/Players24.hpp>
 #include <UI/Minimap.hpp>
+#include <UI/GhostTags.hpp>
 #include <runtimeWrite.hpp>
 
 
@@ -249,6 +250,7 @@ void CtrlRaceNameBalloon_refresh(CtrlRaceNameBalloon* _this, u8 hudSlotId) {
     _this->UpdateInfo(hudSlotId);
 
     const u8 playerId = hudSlotId;
+    Pulsar::UI::ApplyGhostTagContent(*_this, playerId);
     if (ExtendedTeamManager::IsActivated()) {
         u8 r, g, b;
         ExtendedTeamSelect::GetTeamColor(ExtendedTeamManager::sInstance->GetPlayerTeam(playerId), r, g, b);
