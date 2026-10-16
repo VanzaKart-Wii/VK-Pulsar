@@ -463,7 +463,7 @@ static void WinningTrackBMG(PulsarId winningCourse) {
 kmCall(0x80644344, WinningTrackBMG);
 
 //Rewrote InitSelf to start with correct TPLs
-static void ExtCupSelectCupInitSelf(CtrlMenuCupSelectCup* cups) {
+void ExtCupSelectCupInitSelf(CtrlMenuCupSelectCup* cups) {
     const CupsConfig* cupsConfig = CupsConfig::sInstance;
     PulsarCupId selCup = cupsConfig->lastSelectedCup;
     cups->curCupID = selCup;

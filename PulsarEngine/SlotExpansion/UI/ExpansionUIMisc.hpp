@@ -5,8 +5,11 @@
 #include <PulsarSystem.hpp>
 #include <UI/UI.hpp>
 
+class CtrlMenuCupSelectCup;
+
 namespace Pulsar {
 namespace UI {
+void ExtCupSelectCupInitSelf(CtrlMenuCupSelectCup* cups);
 int GetTrackVariantBMGId(PulsarId pulsarId, u8 variantIdx);
 int GetTrackAuthorBMGId(PulsarId pulsarId, u8 variantIdx);
 int GetTrackBMGId(PulsarId pulsarId, bool useCommonName);

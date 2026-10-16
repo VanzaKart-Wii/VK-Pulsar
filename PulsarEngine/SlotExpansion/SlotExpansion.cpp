@@ -111,14 +111,17 @@ kmPatchExitPoint(UseCorrectCourseWrapper, 0x8052f228);
 static void VSRaceRandomFix(SectionParams* params) { //properly randomizes tracks and sets the first one
     params->vsRaceLimit = 32;
     CupsConfig* cupsConfig = CupsConfig::sInstance;
+    cupsConfig->UpdateCustomLayout();
+    const u32 poolSize = cupsConfig->GetRandomPoolSize();
     Random random;
     PulsarId id;
     bool isRepeat;
     for (int i = 0; i < 32; ++i) {
+        const int firstCompared = poolSize > static_cast<u32>(i) ? 0 : i - static_cast<int>(poolSize) + 1;
         do {
             id = cupsConfig->RandomizeTrack();
             isRepeat = false;
-            for (int j = 0; j < i; ++j) {
+            for (int j = firstCompared; j < i; ++j) {
                 if (params->vsTracks[j] == id) {
                     isRepeat = true;
                     break;

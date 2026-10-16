@@ -23,12 +23,15 @@ public:
     CupsConfig(const CupsHolder& rawCups);
 
     PulsarId ConvertTrack_PulsarCupToTrack(PulsarCupId pulsarCupId, u32 rowIdx) const {
+        if (!IsRegCup(pulsarCupId) && this->isCustomActive) {
+            return static_cast<PulsarId>(catalog[((pulsarCupId - 0x40) * 4 + rowIdx) % catalogCount] + 0x100);
+        }
         if (IsRegCup(pulsarCupId) || !this->isAlphabeticalLayout) return static_cast<PulsarId>(pulsarCupId * 4 + rowIdx);
         else return static_cast<PulsarId>(alphabeticalArray[(pulsarCupId - 0x40) * 4 + rowIdx] + 0x100);
     }
 
     //Cup Functions
-    int GetTotalCupCount() const { return ctsCupCount + HasRegs() * 8; } //good
+    int GetTotalCupCount() const { return (isCustomActive ? customCupCount : ctsCupCount) + HasRegs() * 8; } //good
     int GetCtsTrackCount() const { return ctsCupCount * 4; } //used by random, good, but also by settings and path
     int GetEffectiveTrackCount() const { return (definedCTsCupCount + HasRegs() * 8) * 4; } //settings and froom msgs
     void ToggleCTs(bool enabled);
@@ -64,6 +67,11 @@ public:
     void SaveSelectedCourse(const PushButton& courseButton);
     PulsarCupId GetNextCupId(PulsarCupId cupId, s32 direction) const;
     PulsarId RandomizeTrack() const;
+    PulsarId RandomizeDisplayTrack() const;
+    u32 GetRandomPoolSize() const;
+    void LoadCatalog();
+    void UpdateCustomLayout();
+    bool IsCustomLayout() const { return isCustomActive; }
     static bool IsOutOfPool(PulsarId id); //left out of this room's tracks (PULSAR_NOVANILLA, PULSAR_NOBANNED)
     static bool IsVariantOutOfPool(PulsarId id, u32 variantIdx); //same for a single variant
 
@@ -131,6 +139,12 @@ private:
     u8* lastVariantIdxByTrack;
     u8 pendingVariantIdx;
     bool hasPendingVariant;
+
+    u16* catalog;
+    u32 catalogCount;
+    u32 customCupCount;
+    bool isCustomLayout;
+    bool isCustomActive;
 }; //0x28
 
 }//namespace Pulsar

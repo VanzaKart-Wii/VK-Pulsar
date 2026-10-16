@@ -137,7 +137,8 @@ enum MenuSettingFastMenus {
 
 enum MenuSettingLayout {
     MENUSETTING_LAYOUT_DEFAULT = 0x0,
-    MENUSETTING_LAYOUT_ALPHABETICAL = 0x1
+    MENUSETTING_LAYOUT_ALPHABETICAL = 0x1,
+    MENUSETTING_LAYOUT_CUSTOM = 0x2
 };
 
 enum MenuSettingMusic {

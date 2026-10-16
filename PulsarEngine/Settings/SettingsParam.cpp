@@ -16,7 +16,7 @@ namespace Settings {
 //it had before the panel was reorganised.
 const PageParams Params::uiPages[Params::uiPageCount] ={
     { NAMES(0), 3, 1, //Menu
-        { ROW(0, SETTINGMENU_RADIO_FASTMENUS, 0, 0, 2), ROW(0, SETTINGMENU_RADIO_LAYOUT, 0, 1, 2),
+        { ROW(0, SETTINGMENU_RADIO_FASTMENUS, 0, 0, 2), ROW(0, SETTINGMENU_RADIO_LAYOUT, 0, 1, 3),
           ROW(6, RADIO_MINIMAP, 6, 2, 2) },
         { ROW(0, SETTINGMENU_SCROLL_HUDCOLOR, 0, 1, 13) } },
     { NAMES(1), 6, 3, //Race

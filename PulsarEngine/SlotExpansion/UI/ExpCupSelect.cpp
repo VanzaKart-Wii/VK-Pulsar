@@ -2,6 +2,7 @@
 #include <MarioKartWii/UI/Page/Menu/CourseSelect.hpp>
 #include <SlotExpansion/CupsConfig.hpp>
 #include <SlotExpansion/UI/ExpCupSelect.hpp>
+#include <SlotExpansion/UI/ExpansionUIMisc.hpp>
 #include <UI/UI.hpp>
 #include <Settings/Settings.hpp>
 #include <MarioKartWii/GlobalFunctions.hpp>
@@ -41,10 +42,20 @@ ExpCupSelect::ExpCupSelect() {
 
 void ExpCupSelect::OnActivate() {
     this->randomizedId = PULSARID_NONE;
+    CupsConfig* cupsConfig = CupsConfig::sInstance;
+    const bool wasCustom = cupsConfig->IsCustomLayout();
+    const PulsarCupId prevCup = cupsConfig->lastSelectedCup;
+    cupsConfig->UpdateCustomLayout();
+    if (wasCustom != cupsConfig->IsCustomLayout() || prevCup != cupsConfig->lastSelectedCup) {
+        ExtCupSelectCupInitSelf(&this->ctrlMenuCupSelectCup);
+    }
     PushButton** buttons = reinterpret_cast<PushButton**>(this->ctrlMenuCupSelectCup.childrenGroup.controlArray);
     for (int i = 0; i < 8; ++i) buttons[i]->manipulator.inaccessible = false;
-    this->arrows.leftArrow.manipulator.inaccessible = false;
-    this->arrows.rightArrow.manipulator.inaccessible = false;
+    const bool hideArrows = cupsConfig->GetTotalCupCount() <= 8;
+    this->arrows.leftArrow.manipulator.inaccessible = hideArrows;
+    this->arrows.leftArrow.isHidden = hideArrows;
+    this->arrows.rightArrow.manipulator.inaccessible = hideArrows;
+    this->arrows.rightArrow.isHidden = hideArrows;
     Pages::CupSelect::OnActivate();
 }
 
@@ -103,7 +114,7 @@ void ExpCupSelect::OnStartPress(u32 hudSlotId) {
     const GameMode gamemode = Racedata::sInstance->menusScenario.settings.gamemode;
     const bool isValid = gamemode == MODE_TIME_TRIAL || gamemode == MODE_VS_RACE;
     if (isValid && this->randomizedId == -1) {
-        this->randomizedId = CupsConfig::sInstance->RandomizeTrack();
+        this->randomizedId = CupsConfig::sInstance->RandomizeDisplayTrack();
         for (int i = 0; i < 8; ++i) reinterpret_cast<PushButton**>(this->ctrlMenuCupSelectCup.childrenGroup.controlArray)[i]->manipulator.inaccessible = true;
         this->arrows.leftArrow.manipulator.inaccessible = true;
         this->arrows.rightArrow.manipulator.inaccessible = true;
@@ -212,6 +223,16 @@ void ExpCupSelect::UpdateCupData(PulsarCupId pulsarCupId, LayoutUIControl& contr
     if (CupsConfig::IsRegCup(pulsarCupId)) {
         snprintf(tplName, 0x20, "tt_cup_icon_%s_00.tpl", &cupTPLs[realCupId][8]);
         bmgId = BMG_REGCUPS;
+    }
+    else if (CupsConfig::sInstance->IsCustomLayout()) {
+        const PulsarId firstTrack = CupsConfig::sInstance->ConvertTrack_PulsarCupToTrack(pulsarCupId, 0);
+        const u32 trackCup = CupsConfig::ConvertCup_PulsarIdToRealId(CupsConfig::ConvertCup_PulsarTrackToCup(firstTrack));
+        wchar_t cupName[0x20];
+        swprintf(cupName, 0x20, L"Cup %d", realCupId + 1);
+        info.strings[0] = cupName;
+        snprintf(tplName, 0x20, "icon_%03d.tpl", trackCup % System::sInstance->GetInfo().GetCupIconCount());
+        realCupId = 0;
+        bmgId = BMG_TEXT;
     }
     else {
         u32 tplId = realCupId;

@@ -16,7 +16,8 @@ CupsConfig::CupsConfig(const CupsHolder& rawCups) : regsMode(rawCups.regsMode),
 //Cup actions initialization
 hasOddCups(false),
 winningCourse(PULSARID_NONE), selectedCourse(PULSARID_FIRSTREG), lastSelectedCup(PULSARCUPID_FIRSTREG), lastSelectedCupButtonIdx(0), isAlphabeticalLayout(false),
-lastVariantIdxByTrack(nullptr), pendingVariantIdx(0), hasPendingVariant(false)
+lastVariantIdxByTrack(nullptr), pendingVariantIdx(0), hasPendingVariant(false),
+catalog(nullptr), catalogCount(0), customCupCount(0), isCustomLayout(false), isCustomActive(false)
 {
     lastVariantIdxByTrack = new u8[0x2000];
     memset(lastVariantIdxByTrack, 0, 0x2000);
@@ -161,10 +162,35 @@ void CupsConfig::ToggleCTs(bool enabled) {
         }
     }
     ctsCupCount = count;
+    this->UpdateCustomLayout();
+}
+
+void CupsConfig::UpdateCustomLayout() {
+    const RKNet::Controller* controller = RKNet::Controller::sInstance;
+    const bool isOffline = controller == nullptr || controller->connectionState == RKNet::CONNECTIONSTATE_SHUTDOWN;
+    const Racedata* racedata = Racedata::sInstance;
+    const GameMode gamemode = racedata != nullptr ? racedata->menusScenario.settings.gamemode : MODE_VS_RACE;
+    const bool isRaceMode = gamemode != MODE_GRAND_PRIX && gamemode != MODE_BATTLE;
+    this->isCustomActive = this->isCustomLayout && this->catalogCount > 0 && this->ctsCupCount > 0 && isOffline && isRaceMode;
+    if (!this->isCustomActive) return;
+
+    u32 cupCount = (this->catalogCount + 3) / 4;
+    if (cupCount & 1) ++cupCount;
+    if (!this->hasRegs && cupCount < 8) cupCount = 8;
+    this->customCupCount = cupCount;
+    if (!IsRegCup(this->lastSelectedCup) && this->lastSelectedCup - PULSARCUPID_FIRSTCT >= cupCount) {
+        this->lastSelectedCup = PULSARCUPID_FIRSTCT;
+        this->lastSelectedCupButtonIdx = 0;
+        this->selectedCourse = this->ConvertTrack_PulsarCupToTrack(PULSARCUPID_FIRSTCT, 0);
+    }
 }
 
 void CupsConfig::SetLayout() {
-    CupsConfig::sInstance->isAlphabeticalLayout = Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_MENU, SETTINGMENU_RADIO_LAYOUT) == MENUSETTING_LAYOUT_ALPHABETICAL;
+    CupsConfig* self = CupsConfig::sInstance;
+    const u8 layout = Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_MENU, SETTINGMENU_RADIO_LAYOUT);
+    self->isAlphabeticalLayout = layout == MENUSETTING_LAYOUT_ALPHABETICAL;
+    self->isCustomLayout = layout == MENUSETTING_LAYOUT_CUSTOM;
+    self->UpdateCustomLayout();
 }
 Settings::Hook CTLayout(CupsConfig::SetLayout);
 
@@ -181,8 +207,22 @@ void CupsConfig::GetExpertPath(char* dest, PulsarId id, TTMode mode, u8 variantI
     }
 }
 
+PulsarId CupsConfig::RandomizeDisplayTrack() const {
+    if (this->isCustomActive) {
+        Random random;
+        return static_cast<PulsarId>(random.NextLimited(this->catalogCount) + 0x100);
+    }
+    return this->RandomizeTrack();
+}
+
+u32 CupsConfig::GetRandomPoolSize() const {
+    if (this->isCustomActive) return this->catalogCount;
+    return this->GetCtsTrackCount() + this->HasRegs() * 32;
+}
+
 PulsarId CupsConfig::RandomizeTrack() const {
     Random random;
+    if (this->isCustomActive) return static_cast<PulsarId>(this->catalog[random.NextLimited(this->catalogCount)] + 0x100);
     u32 pulsarId;
     //Vanilla tracks are already out through hasRegs, this is for the banned ones. Bounded so that
     //a list banning almost everything can't hang the vote.
