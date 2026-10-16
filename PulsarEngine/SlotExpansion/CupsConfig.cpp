@@ -177,9 +177,9 @@ void CupsConfig::UpdateCustomLayout() {
 
     u32 cupCount = (this->catalogCount + 3) / 4;
     if (cupCount & 1) ++cupCount;
-    if (!this->hasRegs && cupCount < 8) cupCount = 8;
+    if (cupCount < 8) cupCount = 8;
     this->customCupCount = cupCount;
-    if (!IsRegCup(this->lastSelectedCup) && this->lastSelectedCup - PULSARCUPID_FIRSTCT >= cupCount) {
+    if (IsRegCup(this->lastSelectedCup) || this->lastSelectedCup - PULSARCUPID_FIRSTCT >= cupCount) {
         this->lastSelectedCup = PULSARCUPID_FIRSTCT;
         this->lastSelectedCupButtonIdx = 0;
         this->selectedCourse = this->ConvertTrack_PulsarCupToTrack(PULSARCUPID_FIRSTCT, 0);
@@ -224,7 +224,7 @@ u32 CupsConfig::GetRandomPoolSize() const {
 
 PulsarId CupsConfig::RandomizeTrack() const {
     Random random;
-    if (this->isCustomActive) return static_cast<PulsarId>(this->catalog[random.NextLimited(this->catalogCount)] + 0x100);
+    if (this->isCustomActive) return static_cast<PulsarId>(this->catalog[random.NextLimited(this->catalogCount)]);
     u32 pulsarId;
     //Vanilla tracks are already out through hasRegs, this is for the banned ones. Bounded so that
     //a list banning almost everything can't hang the vote.
@@ -269,7 +269,7 @@ PulsarCupId CupsConfig::GetNextCupId(PulsarCupId pulsarId, s32 direction) const 
     const u32 count = this->GetTotalCupCount();
     const u32 min = count < 8 ? 8 : 0;
     const u32 nextIdx = ((idx + direction + count) % count) + min;
-    if (!this->hasRegs && nextIdx < 8) return static_cast<PulsarCupId>(nextIdx + count + 0x38);
+    if (!this->ShowsRegCups() && nextIdx < 8) return static_cast<PulsarCupId>(nextIdx + count + 0x38);
     return ConvertCup_IdxToPulsarId(nextIdx);
 }
 

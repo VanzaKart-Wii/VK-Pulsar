@@ -24,14 +24,14 @@ public:
 
     PulsarId ConvertTrack_PulsarCupToTrack(PulsarCupId pulsarCupId, u32 rowIdx) const {
         if (!IsRegCup(pulsarCupId) && this->isCustomActive) {
-            return static_cast<PulsarId>(catalog[((pulsarCupId - 0x40) * 4 + rowIdx) % catalogCount] + 0x100);
+            return static_cast<PulsarId>(catalog[((pulsarCupId - 0x40) * 4 + rowIdx) % catalogCount]);
         }
         if (IsRegCup(pulsarCupId) || !this->isAlphabeticalLayout) return static_cast<PulsarId>(pulsarCupId * 4 + rowIdx);
         else return static_cast<PulsarId>(alphabeticalArray[(pulsarCupId - 0x40) * 4 + rowIdx] + 0x100);
     }
 
     //Cup Functions
-    int GetTotalCupCount() const { return (isCustomActive ? customCupCount : ctsCupCount) + HasRegs() * 8; } //good
+    int GetTotalCupCount() const { return isCustomActive ? customCupCount : ctsCupCount + HasRegs() * 8; } //good
     int GetCtsTrackCount() const { return ctsCupCount * 4; } //used by random, good, but also by settings and path
     int GetEffectiveTrackCount() const { return (definedCTsCupCount + HasRegs() * 8) * 4; } //settings and froom msgs
     void ToggleCTs(bool enabled);
@@ -47,6 +47,7 @@ public:
     inline int GetCorrectMusicSlot() const;
 
     bool HasRegs() const { return hasRegs; }
+    bool ShowsRegCups() const { return hasRegs && !isCustomActive; }
     bool HasOddCups() const { return hasOddCups; }
     bool IsAlphabetical() const { return isAlphabeticalLayout; }
     const u16* GetAlphabeticalArray() const { return alphabeticalArray; }

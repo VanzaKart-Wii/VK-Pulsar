@@ -135,7 +135,7 @@ void ExpCupSelect::AfterControlUpdate() {
         PushButton** buttons = reinterpret_cast<PushButton**>(this->ctrlMenuCupSelectCup.childrenGroup.controlArray);
         if (this->randomizedId != PULSARID_NONE) {
             SheetSelectControl::SheetSelectButton* arrow;
-            const u32 subtraHend = !cupsConfig->HasRegs() * 8;
+            const u32 subtraHend = !cupsConfig->ShowsRegCups() * 8;
             const u32 randomizedCupButtonIdx = CupsConfig::ConvertCup_PulsarIdToIdx(CupsConfig::ConvertCup_PulsarTrackToCup(this->randomizedId)) - subtraHend;
             const u32 button0Idx = CupsConfig::ConvertCup_PulsarIdToIdx(static_cast<PulsarCupId>(buttons[0]->buttonId)) - subtraHend;
             const u32 button7Idx = CupsConfig::ConvertCup_PulsarIdToIdx(static_cast<PulsarCupId>(buttons[7]->buttonId)) - subtraHend;
@@ -230,7 +230,8 @@ void ExpCupSelect::UpdateCupData(PulsarCupId pulsarCupId, LayoutUIControl& contr
         wchar_t cupName[0x20];
         swprintf(cupName, 0x20, L"Cup %d", realCupId + 1);
         info.strings[0] = cupName;
-        snprintf(tplName, 0x20, "icon_%03d.tpl", trackCup % System::sInstance->GetInfo().GetCupIconCount());
+        if (CupsConfig::IsReg(firstTrack)) snprintf(tplName, 0x20, "tt_cup_icon_%s_00.tpl", &cupTPLs[trackCup][8]);
+        else snprintf(tplName, 0x20, "icon_%03d.tpl", trackCup % System::sInstance->GetInfo().GetCupIconCount());
         realCupId = 0;
         bmgId = BMG_TEXT;
     }

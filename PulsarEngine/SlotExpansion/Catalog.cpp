@@ -11,17 +11,30 @@ static const char catalogHeader[] =
     "# IT: Attivalo in Impostazioni > Menu > Layout > Personalizzato.\n"
     "#     Una pista per riga, nell'ordine in cui vuoi vederla nelle coppe.\n"
     "#     Per nascondere una pista cancella la riga o mettici # davanti.\n"
+    "#     Ci sono anche le piste Nintendo: con il catalogo attivo le 8 coppe originali non compaiono.\n"
     "#     Offline il random sceglie solo tra le piste di questo elenco.\n"
     "#     Il codice a sinistra identifica la pista: non modificarlo.\n"
     "# EN: Enable it in Settings > Menu > Layout > Custom.\n"
     "#     One track per line, in the order you want to see it in the cups.\n"
     "#     To hide a track delete its line or put # in front of it.\n"
+    "#     The Nintendo tracks are here too: with the catalog on, the 8 original cups are not shown.\n"
     "#     Offline, random only picks among the tracks of this list.\n"
     "#     The code on the left identifies the track: don't change it.\n"
     "\n";
 
 static const char newTracksHeader[] =
     "\n# Piste nuove del pack: togli il # per aggiungerle / New tracks of the pack: remove the # to add them\n";
+
+static const char* const regNames[32] = {
+    "Luigi Circuit", "Moo Moo Meadows", "Mushroom Gorge", "Toad's Factory",
+    "GCN Peach Beach", "DS Yoshi Falls", "SNES Ghost Valley 2", "N64 Mario Raceway",
+    "Mario Circuit", "Coconut Mall", "DK Summit", "Wario's Gold Mine",
+    "N64 Sherbet Land", "GBA Shy Guy Beach", "DS Delfino Square", "GCN Waluigi Stadium",
+    "Daisy Circuit", "Koopa Cape", "Maple Treeway", "Grumble Volcano",
+    "DS Desert Hills", "GBA Bowser Castle 3", "N64 DK's Jungle Parkway", "GCN Mario Circuit",
+    "Dry Dry Ruins", "Moonview Highway", "Bowser's Castle", "Rainbow Road",
+    "SNES Mario Circuit 3", "DS Peach Gardens", "GCN DK Mountain", "N64 Bowser's Castle"
+};
 
 static const u32 maxNameLength = 60;
 static const u32 lineLength = 8 + 1 + maxNameLength + 1;
@@ -55,16 +68,22 @@ static bool ParseCRC32(const char* cur, const char* end, u32& crc32) {
     return true;
 }
 
+static PulsarId EntryToPulsarId(u32 entry, u32 regCount) {
+    if (entry < regCount) return static_cast<PulsarId>(entry);
+    return static_cast<PulsarId>(entry - regCount + PULSARID_FIRSTCT);
+}
+
 static u32 WriteTrackLine(char* dest, u32 crc32, PulsarId id, bool isHidden) {
     char name[0x100];
     name[0] = '\0';
-    if (UI::GetCustomMsg(UI::GetTrackBMGId(id, true)) != nullptr) UI::GetTrackBMG(name, id);
+    if (CupsConfig::IsReg(id)) snprintf(name, sizeof(name), "%s", regNames[id]);
+    else if (UI::GetCustomMsg(UI::GetTrackBMGId(id, true)) != nullptr) UI::GetTrackBMG(name, id);
     name[maxNameLength] = '\0';
     for (char* c = name; *c != '\0'; ++c) if (static_cast<u8>(*c) < 0x20) *c = ' ';
     return snprintf(dest, lineLength + 3, isHidden ? "# %08x %s\n" : "%08x %s\n", crc32, name);
 }
 
-static void ParseCatalogLine(const char* line, u32 length, const Track* tracks, u32 trackCount, bool* isListed, u16* catalog, u32& count) {
+static void ParseCatalogLine(const char* line, u32 length, const CupsConfig& cups, u32 regCount, u32 entryCount, bool* isListed, u16* catalog, u32& count) {
     const char* cur = line;
     const char* end = line + length;
     while (cur < end && IsBlank(*cur)) ++cur;
@@ -76,10 +95,12 @@ static void ParseCatalogLine(const char* line, u32 length, const Track* tracks, 
     }
     u32 crc32;
     if (!ParseCRC32(cur, end, crc32)) return;
-    for (u32 i = 0; i < trackCount; ++i) {
-        if (tracks[i].crc32 != crc32 || isListed[i]) continue;
+    for (u32 i = 0; i < entryCount; ++i) {
+        if (isListed[i]) continue;
+        const PulsarId id = EntryToPulsarId(i, regCount);
+        if (static_cast<u32>(cups.GetCRC32(id)) != crc32) continue;
         isListed[i] = true;
-        if (!isHidden) catalog[count++] = i;
+        if (!isHidden) catalog[count++] = static_cast<u16>(id);
         return;
     }
 }
@@ -104,7 +125,8 @@ void CupsConfig::RequestCatalog() {
 }
 
 void CupsConfig::LoadCatalog() {
-    const u32 trackCount = (this->hasOddCups ? this->definedCTsCupCount - 1 : this->definedCTsCupCount) * 4;
+    const u32 regCount = this->regsMode > 0 ? 32 : 0;
+    const u32 trackCount = regCount + (this->hasOddCups ? this->definedCTsCupCount - 1 : this->definedCTsCupCount) * 4;
     System* system = System::sInstance;
     IO* io = IO::sInstance;
     if (trackCount == 0 || io == nullptr || this->catalog != nullptr) return;
@@ -129,14 +151,14 @@ void CupsConfig::LoadCatalog() {
             for (s32 i = 0; i < read; ++i) {
                 const char c = chunk[i];
                 if (c == '\n') {
-                    ParseCatalogLine(line, lineUsed, this->mainTracks, trackCount, isListed, catalog, count);
+                    ParseCatalogLine(line, lineUsed, *this, regCount, trackCount, isListed, catalog, count);
                     lineUsed = 0;
                 }
                 else if (lineUsed < lineBufferSize) line[lineUsed++] = c;
             }
             endsWithNewLine = chunk[read - 1] == '\n';
         }
-        if (lineUsed != 0) ParseCatalogLine(line, lineUsed, this->mainTracks, trackCount, isListed, catalog, count);
+        if (lineUsed != 0) ParseCatalogLine(line, lineUsed, *this, regCount, trackCount, isListed, catalog, count);
         io->Close();
     }
 
@@ -145,7 +167,7 @@ void CupsConfig::LoadCatalog() {
     for (u32 i = 0; i < trackCount; ++i) {
         if (isListed[i]) continue;
         hasMissing = true;
-        if (isNewFile) catalog[count++] = i;
+        if (isNewFile) catalog[count++] = static_cast<u16>(EntryToPulsarId(i, regCount));
     }
 
     if (hasMissing) {
@@ -168,7 +190,8 @@ void CupsConfig::LoadCatalog() {
                     io->Write(length, chunk);
                     length = 0;
                 }
-                length += WriteTrackLine(chunk + length, this->mainTracks[i].crc32, static_cast<PulsarId>(i + PULSARID_FIRSTCT), !isNewFile);
+                const PulsarId id = EntryToPulsarId(i, regCount);
+                length += WriteTrackLine(chunk + length, this->GetCRC32(id), id, !isNewFile);
             }
             if (length != 0) io->Write(length, chunk);
             io->Close();

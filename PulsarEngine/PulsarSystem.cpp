@@ -444,6 +444,7 @@ void System::UpdateContext() {
         whatever the last room left behind (no vanilla after a worldwide, or the host's old setting).
     */
     if(isCT && CupsConfig::sInstance != nullptr) CupsConfig::sInstance->ToggleCTs(true);
+    if(CupsConfig::sInstance != nullptr) CupsConfig::sInstance->UpdateCustomLayout();
 
     //Create temp instances if needed:
     /*
