@@ -15,8 +15,9 @@ namespace Settings {
 //File pages: 0 menu, 1 race, 2 host, 3 OTT, 4 KO, 5 Extended Teams, 6 language. Every row keeps the slot and the texts
 //it had before the panel was reorganised.
 const PageParams Params::uiPages[Params::uiPageCount] ={
-    { NAMES(0), 2, 1, //Menu
-        { ROW(0, SETTINGMENU_RADIO_FASTMENUS, 0, 0, 2), ROW(0, SETTINGMENU_RADIO_LAYOUT, 0, 1, 2) },
+    { NAMES(0), 3, 1, //Menu
+        { ROW(0, SETTINGMENU_RADIO_FASTMENUS, 0, 0, 2), ROW(0, SETTINGMENU_RADIO_LAYOUT, 0, 1, 2),
+          ROW(6, RADIO_MINIMAP, 6, 2, 2) },
         { ROW(0, SETTINGMENU_SCROLL_HUDCOLOR, 0, 1, 13) } },
     { NAMES(1), 6, 3, //Race
         { ROW(1, SETTINGRACE_RADIO_MII, 1, 0, 2), ROW(1, SETTINGRACE_RADIO_BATTLE, 1, 2, 2), ROW(1, SETTINGRACE_RADIO_FPS, 1, 3, 2),

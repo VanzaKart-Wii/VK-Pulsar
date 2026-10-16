@@ -376,6 +376,7 @@ enum Language {
 enum {
     RADIO_PATCHES = 0, //same user page as the language: the Misc page of the panel
     RADIO_HARDAI = 1, //same user page and panel page
+    RADIO_MINIMAP = 2,
     SCROLLER_LANGUAGE = 0 + 6
 };
 
@@ -390,6 +391,11 @@ enum MiscSettingPatches {
 enum RaceSettingHardAI {
     HARDAI_DISABLED,
     HARDAI_ENABLED
+};
+
+enum MenuSettingMinimap {
+    MINIMAP_SHOWN,
+    MINIMAP_HIDDEN
 };
 
 }//namespace Pulsar

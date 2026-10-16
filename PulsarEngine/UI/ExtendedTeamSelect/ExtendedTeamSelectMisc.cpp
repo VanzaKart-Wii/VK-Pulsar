@@ -16,6 +16,7 @@
 #include <Network/Rating/StaffBadge.hpp>
 #include <Race/Players24/Online24.hpp>
 #include <Race/Players24/Players24.hpp>
+#include <UI/Minimap.hpp>
 #include <runtimeWrite.hpp>
 
 
@@ -179,6 +180,7 @@ kmCall(0x80643ce8, SELECTStageMgr_PrepareRace);
 
 void CtrlRace2DMapCharacter_CalcTransform(CtrlRace2DMapCharacter* _this, const Vec3& kartPosition, Vec2& dest, u32 r6) {
     _this->CalculatePosition(kartPosition, dest, r6);
+    Pulsar::UI::ApplyMinimapSetting(*_this);
     RacedataScenario& menuScenario = Racedata::sInstance->menusScenario;
     RKNet::Controller* controller = RKNet::Controller::sInstance;
     if (ExtendedTeamManager::IsActivated()) {
