@@ -139,6 +139,7 @@ private:
     u16* invertedAlphabeticalArray;
 
     u8* lastVariantIdxByTrack;
+    u32 lastVariantCount;
     u8 pendingVariantIdx;
     bool hasPendingVariant;
 

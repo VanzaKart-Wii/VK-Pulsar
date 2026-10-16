@@ -20,8 +20,6 @@ lastVariantIdxByTrack(nullptr), pendingVariantIdx(0), hasPendingVariant(false),
 catalog(nullptr), catalogCount(0), customCupCount(0), isCustomLayout(false), isCustomActive(false), isCatalogAllowed(false),
 isCatalogRequested(false)
 {
-    lastVariantIdxByTrack = new u8[0x2000];
-    memset(lastVariantIdxByTrack, 0, 0x2000);
     if (regsMode != 1) {
         lastSelectedCup = PULSARCUPID_FIRSTCT;
         selectedCourse = PULSARID_FIRSTCT;
@@ -38,6 +36,9 @@ isCatalogRequested(false)
     for (int i = 0; i < 4; ++i) trophyCount[i] = rawCups.trophyCount[i];
 
     u16 ctsCount = count * 4;
+    lastVariantCount = PULSARID_FIRSTCT + ctsCount;
+    lastVariantIdxByTrack = new u8[lastVariantCount];
+    memset(lastVariantIdxByTrack, 0, lastVariantCount);
 
 
     mainTracks = new Track[ctsCount];
@@ -295,13 +296,13 @@ void CupsConfig::ClearPendingVariant() {
 
 u8 CupsConfig::GetLastSelectedVariant(PulsarId id) const {
     const u32 trackIdx = static_cast<u32>(id);
-    if (trackIdx >= 0x2000 || this->lastVariantIdxByTrack == nullptr) return 0;
+    if (trackIdx >= this->lastVariantCount || this->lastVariantIdxByTrack == nullptr) return 0;
     return this->lastVariantIdxByTrack[trackIdx];
 }
 
 void CupsConfig::SetLastSelectedVariant(PulsarId id, u8 variantIdx) {
     const u32 trackIdx = static_cast<u32>(id);
-    if (trackIdx >= 0x2000 || this->lastVariantIdxByTrack == nullptr) return;
+    if (trackIdx >= this->lastVariantCount || this->lastVariantIdxByTrack == nullptr) return;
     this->lastVariantIdxByTrack[trackIdx] = variantIdx;
 }
 
