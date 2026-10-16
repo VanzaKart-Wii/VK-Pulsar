@@ -17,7 +17,8 @@ CupsConfig::CupsConfig(const CupsHolder& rawCups) : regsMode(rawCups.regsMode),
 hasOddCups(false),
 winningCourse(PULSARID_NONE), selectedCourse(PULSARID_FIRSTREG), lastSelectedCup(PULSARCUPID_FIRSTREG), lastSelectedCupButtonIdx(0), isAlphabeticalLayout(false),
 lastVariantIdxByTrack(nullptr), pendingVariantIdx(0), hasPendingVariant(false),
-catalog(nullptr), catalogCount(0), customCupCount(0), isCustomLayout(false), isCustomActive(false)
+catalog(nullptr), catalogCount(0), customCupCount(0), isCustomLayout(false), isCustomActive(false), isCatalogAllowed(false),
+isCatalogRequested(false)
 {
     lastVariantIdxByTrack = new u8[0x2000];
     memset(lastVariantIdxByTrack, 0, 0x2000);
@@ -190,6 +191,7 @@ void CupsConfig::SetLayout() {
     const u8 layout = Settings::Mgr::Get().GetSettingValue(Settings::SETTINGSTYPE_MENU, SETTINGMENU_RADIO_LAYOUT);
     self->isAlphabeticalLayout = layout == MENUSETTING_LAYOUT_ALPHABETICAL;
     self->isCustomLayout = layout == MENUSETTING_LAYOUT_CUSTOM;
+    self->RequestCatalog();
     self->UpdateCustomLayout();
 }
 Settings::Hook CTLayout(CupsConfig::SetLayout);

@@ -25,6 +25,8 @@ static const char newTracksHeader[] =
 
 static const u32 maxNameLength = 60;
 static const u32 lineLength = 8 + 1 + maxNameLength + 1;
+static const u32 chunkSize = 0x800;
+static const u32 lineBufferSize = 0x40;
 
 static s32 HexDigit(char c) {
     if (c >= '0' && c <= '9') return c - '0';
@@ -62,77 +64,91 @@ static u32 WriteTrackLine(char* dest, u32 crc32, PulsarId id, bool isHidden) {
     return snprintf(dest, lineLength + 3, isHidden ? "# %08x %s\n" : "%08x %s\n", crc32, name);
 }
 
+static void ParseCatalogLine(const char* line, u32 length, const Track* tracks, u32 trackCount, bool* isListed, u16* catalog, u32& count) {
+    const char* cur = line;
+    const char* end = line + length;
+    while (cur < end && IsBlank(*cur)) ++cur;
+    bool isHidden = false;
+    if (cur < end && *cur == '#') {
+        isHidden = true;
+        ++cur;
+        while (cur < end && IsBlank(*cur)) ++cur;
+    }
+    u32 crc32;
+    if (!ParseCRC32(cur, end, crc32)) return;
+    for (u32 i = 0; i < trackCount; ++i) {
+        if (tracks[i].crc32 != crc32 || isListed[i]) continue;
+        isListed[i] = true;
+        if (!isHidden) catalog[count++] = i;
+        return;
+    }
+}
+
+void CupsConfig::EnableCatalog() {
+    this->isCatalogAllowed = true;
+    if (this->isCustomLayout) {
+        this->isCatalogRequested = true;
+        this->LoadCatalog();
+    }
+    this->UpdateCustomLayout();
+}
+
+void CupsConfig::LoadCatalogTask(void*) {
+    CupsConfig::sInstance->LoadCatalog();
+}
+
+void CupsConfig::RequestCatalog() {
+    if (!this->isCustomLayout || !this->isCatalogAllowed || this->isCatalogRequested) return;
+    this->isCatalogRequested = true;
+    System::sInstance->taskThread->Request(&CupsConfig::LoadCatalogTask, nullptr, 0);
+}
+
 void CupsConfig::LoadCatalog() {
     const u32 trackCount = (this->hasOddCups ? this->definedCTsCupCount - 1 : this->definedCTsCupCount) * 4;
-    if (trackCount == 0) return;
     System* system = System::sInstance;
     IO* io = IO::sInstance;
-    if (io == nullptr) return;
+    if (trackCount == 0 || io == nullptr || this->catalog != nullptr) return;
 
     char path[IOS::ipcMaxPath];
     snprintf(path, IOS::ipcMaxPath, "%s/Catalog.txt", system->GetModFolder());
 
-    this->catalog = new (system->heap) u16[trackCount];
-    this->catalogCount = 0;
+    u16* catalog = new (system->heap) u16[trackCount];
+    u32 count = 0;
     bool* isListed = new (system->heap) bool[trackCount];
     for (u32 i = 0; i < trackCount; ++i) isListed[i] = false;
+    char* chunk = io->Alloc<char>(chunkSize);
 
     s32 fileSize = 0;
     bool endsWithNewLine = true;
     if (io->OpenFile(path, FILE_MODE_READ)) {
         fileSize = io->GetFileSize();
-        if (fileSize > 0) {
-            char* text = io->Alloc<char>(fileSize);
-            const s32 read = io->Read(fileSize, text);
-            if (read > 0) {
-                const char* cur = text;
-                const char* end = text + read;
-                endsWithNewLine = end[-1] == '\n';
-                while (cur < end) {
-                    const char* lineEnd = cur;
-                    while (lineEnd < end && *lineEnd != '\n') ++lineEnd;
-                    while (cur < lineEnd && IsBlank(*cur)) ++cur;
-                    bool isHidden = false;
-                    if (cur < lineEnd && *cur == '#') {
-                        isHidden = true;
-                        ++cur;
-                        while (cur < lineEnd && IsBlank(*cur)) ++cur;
-                    }
-                    u32 crc32;
-                    if (ParseCRC32(cur, lineEnd, crc32)) {
-                        for (u32 i = 0; i < trackCount; ++i) {
-                            if (this->mainTracks[i].crc32 != crc32 || isListed[i]) continue;
-                            isListed[i] = true;
-                            if (!isHidden) this->catalog[this->catalogCount++] = i;
-                            break;
-                        }
-                    }
-                    cur = lineEnd + 1;
+        char line[lineBufferSize];
+        u32 lineUsed = 0;
+        s32 read;
+        while (fileSize > 0 && (read = io->Read(chunkSize, chunk)) > 0) {
+            for (s32 i = 0; i < read; ++i) {
+                const char c = chunk[i];
+                if (c == '\n') {
+                    ParseCatalogLine(line, lineUsed, this->mainTracks, trackCount, isListed, catalog, count);
+                    lineUsed = 0;
                 }
+                else if (lineUsed < lineBufferSize) line[lineUsed++] = c;
             }
-            EGG::Heap::free(text, nullptr);
+            endsWithNewLine = chunk[read - 1] == '\n';
         }
+        if (lineUsed != 0) ParseCatalogLine(line, lineUsed, this->mainTracks, trackCount, isListed, catalog, count);
         io->Close();
     }
 
     const bool isNewFile = fileSize <= 0;
-    u32 missingCount = 0;
-    for (u32 i = 0; i < trackCount; ++i) if (!isListed[i]) ++missingCount;
+    bool hasMissing = false;
+    for (u32 i = 0; i < trackCount; ++i) {
+        if (isListed[i]) continue;
+        hasMissing = true;
+        if (isNewFile) catalog[count++] = i;
+    }
 
-    if (missingCount != 0) {
-        const u32 bufferSize = sizeof(catalogHeader) + sizeof(newTracksHeader) + missingCount * (lineLength + 3) + 2;
-        char* buffer = io->Alloc<char>(bufferSize);
-        u32 length = 0;
-        if (isNewFile) length += snprintf(buffer, bufferSize, "%s", catalogHeader);
-        else {
-            if (!endsWithNewLine) buffer[length++] = '\n';
-            length += snprintf(buffer + length, bufferSize - length, "%s", newTracksHeader);
-        }
-        for (u32 i = 0; i < trackCount; ++i) {
-            if (isListed[i]) continue;
-            length += WriteTrackLine(buffer + length, this->mainTracks[i].crc32, static_cast<PulsarId>(i + PULSARID_FIRSTCT), !isNewFile);
-            if (isNewFile) this->catalog[this->catalogCount++] = i;
-        }
+    if (hasMissing) {
         bool isOpen;
         if (isNewFile) isOpen = io->CreateAndOpen(path, FILE_MODE_WRITE);
         else {
@@ -140,14 +156,29 @@ void CupsConfig::LoadCatalog() {
             if (isOpen) io->Seek(fileSize);
         }
         if (isOpen) {
-            io->Write(length, buffer);
+            u32 length = 0;
+            if (isNewFile) length = snprintf(chunk, chunkSize, "%s", catalogHeader);
+            else {
+                if (!endsWithNewLine) chunk[length++] = '\n';
+                length += snprintf(chunk + length, chunkSize - length, "%s", newTracksHeader);
+            }
+            for (u32 i = 0; i < trackCount; ++i) {
+                if (isListed[i]) continue;
+                if (length + lineLength + 3 > chunkSize) {
+                    io->Write(length, chunk);
+                    length = 0;
+                }
+                length += WriteTrackLine(chunk + length, this->mainTracks[i].crc32, static_cast<PulsarId>(i + PULSARID_FIRSTCT), !isNewFile);
+            }
+            if (length != 0) io->Write(length, chunk);
             io->Close();
         }
-        EGG::Heap::free(buffer, nullptr);
     }
 
+    EGG::Heap::free(chunk, nullptr);
     delete[] isListed;
-    this->UpdateCustomLayout();
+    this->catalog = catalog;
+    this->catalogCount = count;
 }
 
 }//namespace Pulsar

@@ -140,7 +140,7 @@ void System::Init(const ConfigFile& conf) {
     this->rawBmg = EGG::Heap::alloc<BMGHeader>(confBMG->fileLength, 0x4, this->heap);
     memcpy(this->rawBmg, confBMG, confBMG->fileLength);
     this->customBmgs.Init(*this->rawBmg);
-    cupsConfig->LoadCatalog();
+    cupsConfig->EnableCatalog();
     this->AfterInit();
     DIAG_END();
     DIAG_HEAP("free system, Init done");

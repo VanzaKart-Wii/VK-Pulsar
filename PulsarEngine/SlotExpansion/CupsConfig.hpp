@@ -69,7 +69,8 @@ public:
     PulsarId RandomizeTrack() const;
     PulsarId RandomizeDisplayTrack() const;
     u32 GetRandomPoolSize() const;
-    void LoadCatalog();
+    void EnableCatalog();
+    void RequestCatalog();
     void UpdateCustomLayout();
     bool IsCustomLayout() const { return isCustomActive; }
     static bool IsOutOfPool(PulsarId id); //left out of this room's tracks (PULSAR_NOVANILLA, PULSAR_NOBANNED)
@@ -140,11 +141,16 @@ private:
     u8 pendingVariantIdx;
     bool hasPendingVariant;
 
+    void LoadCatalog();
+    static void LoadCatalogTask(void*);
+
     u16* catalog;
     u32 catalogCount;
     u32 customCupCount;
     bool isCustomLayout;
     bool isCustomActive;
+    bool isCatalogAllowed;
+    bool isCatalogRequested;
 }; //0x28
 
 }//namespace Pulsar
