@@ -378,6 +378,7 @@ enum {
     RADIO_HARDAI = 1, //same user page and panel page
     RADIO_MINIMAP = 2,
     RADIO_GHOSTTAGS = 3,
+    RADIO_SAVESTATES = 4,
     SCROLLER_LANGUAGE = 0 + 6
 };
 
@@ -404,6 +405,11 @@ enum MiscSettingGhostTags {
     GHOSTTAGS_TIME,
     GHOSTTAGS_DATE,
     GHOSTTAGS_HIDDEN
+};
+
+enum MiscSettingSaveStates {
+    SAVESTATES_DISABLED,
+    SAVESTATES_ENABLED
 };
 
 }//namespace Pulsar

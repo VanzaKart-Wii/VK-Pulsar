@@ -4,6 +4,7 @@
 #include <MarioKartWii/UI/Page/Menu/CourseSelect.hpp>
 #include <Ghost/UI/ExpGhostSelect.hpp>
 #include <Ghost/GhostManager.hpp>
+#include <Race/SaveStates.hpp>
 #include <Settings/Settings.hpp>
 #include <SlotExpansion/CupsConfig.hpp>
 
@@ -234,6 +235,15 @@ void BeforeEntranceAnimations(Pages::TTSplits* page) {
         page->ctrlRaceCount.FadeIn();
         page->PlaySound(SOUND_ID_NEW_RECORD, -1);
         page->savedGhostMessage.SetMessage(UI::BMG_SAVED_GHOST);
+    }
+
+    else if (SaveStates::WasUsed()) {
+        sectionParams->leaderboardPosition = -1;
+        page->ctrlRaceCount.isHidden = true;
+        if (Ghosts::Mgr::sInstance->GetLeaderboard().GetPosition(page->timers[0]) >= 0
+            && Ghosts::Mgr::sInstance->SaveSaveStateGhost()) {
+            page->savedGhostMessage.SetMessage(UI::BMG_SAVED_GHOST);
+        }
     }
 
     //Finish Time Leaderboard check and request

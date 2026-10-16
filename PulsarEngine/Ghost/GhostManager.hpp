@@ -65,6 +65,15 @@ public:
     //u32 GetGhostIndex(const GhostListEntry& entry) const;
     bool LoadGhost(RKG& dest, u32 index) const;
 
+    static const u32 saveStateFlagOffset = 0x33;
+    static const u8 saveStateFlag = 'S';
+    static void SetSaveStateFlag(RKG& rkg) {
+        reinterpret_cast<u8*>(&rkg.header)[saveStateFlagOffset] = saveStateFlag;
+    }
+    static bool HasSaveStateFlag(const RKG& rkg) {
+        return reinterpret_cast<const u8*>(&rkg.header)[saveStateFlagOffset] == saveStateFlag;
+    }
+
 
 private:
     Mgr() : pulsarId(PULSARID_NONE), files(nullptr), areGhostsSaving(true), variantIdx(0) {
@@ -79,6 +88,7 @@ private:
     void Reset();
     void SaveLeaderboard();
     bool SaveGhost(const RKSYS::LicenseLdbEntry& entry, u32 ldbPosition, bool isFlap);
+    bool SaveSaveStateGhost();
     bool EnableGhost(const GhostListEntry& entry, bool isMain);
     void DisableGhost(const GhostListEntry& entry);
     void LoadAllGhosts(u32 maxGhosts, bool isGhostRace);

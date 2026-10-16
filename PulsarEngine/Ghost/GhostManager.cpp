@@ -3,6 +3,7 @@
 #include <IO/IO.hpp>
 #include <SlotExpansion/CupsConfig.hpp>
 #include <core/rvl/os/OS.hpp>
+#include <Race/SaveStates.hpp>
 
 namespace Pulsar {
 namespace Ghosts {
@@ -103,7 +104,8 @@ void Mgr::Init(PulsarId id, u8 variantIdx) {
         if(ret > 0 && this->rkg.CheckValidity() && this->GetRKGcrc32(this->rkg) != expertCRC32) {
 
             curData.Init(rkg);
-            if(this->expertGhost.isActive && this->expertGhost > curData.finishTime && system->GetInfo().HasTrophies()) {
+            if(this->expertGhost.isActive && this->expertGhost > curData.finishTime && system->GetInfo().HasTrophies()
+                && !HasSaveStateFlag(this->rkg)) {
                 Settings::Mgr::sInstance->AddTrophy(cupsConfig->GetCRC32(id), ttMode);
                 this->leaderboard.AddTrophy();
             }
@@ -255,6 +257,22 @@ bool Mgr::SaveGhost(const RKSYS::LicenseLdbEntry& entry, u32 ldbPosition, bool i
     return gotTrophy;
 }
 
+bool Mgr::SaveSaveStateGhost() {
+    if(!areGhostsSaving) return false;
+    GhostData data;
+    data.Fill(0);
+    RKG buffer;
+    buffer.ClearBuffer();
+    if(!data.CreateRKG(buffer)) return false;
+    SetSaveStateFlag(buffer);
+    if(!buffer.CompressTo(this->rkg)) return false;
+    if(this->cb != nullptr) {
+        this->cb(buffer, IS_SAVING_GHOST, -1);
+    }
+    System::sInstance->taskThread->Request(&Mgr::CreateAndSaveFiles, this, 0);
+    return true;
+}
+
 //When a request has been sent, creates and writes to a RKG, updates Settings and updates the leaderboard
 void Mgr::CreateAndSaveFiles(Mgr* self) {
     char path[IOS::ipcMaxPath];
@@ -349,6 +367,7 @@ kmCall(0x806394f0, Mgr::InsertCustomGroupToList);
 //80855c6c save ghost (get ldr position) r4 timer r5 savedatamanagerlicence
 //8051ca80 write ghost file
 static s32 PlayCorrectFinishAnim(RKSYS::LicenseMgr*, const Timer& timer, CourseId courseId) {
+    if(SaveStates::WasUsed()) return -1;
     return Mgr::GetInstance()->GetLeaderboard().GetPosition(timer);
 }
 kmCall(0x80856fec, PlayCorrectFinishAnim);
